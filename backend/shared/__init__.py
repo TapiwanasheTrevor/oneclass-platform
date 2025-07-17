@@ -1,0 +1,1 @@
+# OneClass Platform Backend Shared Module
