@@ -1,0 +1,123 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oneclass-config
+  namespace: oneclass-platform
+  labels:
+    app.kubernetes.io/name: oneclass-platform
+    app.kubernetes.io/component: config
+data:
+  # Database configuration
+  POSTGRES_DB: "oneclass_production"
+  POSTGRES_USER: "oneclass"
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  
+  # Redis configuration
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  
+  # Application configuration
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  NEXT_TELEMETRY_DISABLED: "1"
+  
+  # Domain configuration
+  NEXT_PUBLIC_DEFAULT_DOMAIN: "oneclass.ac.zw"
+  NEXT_PUBLIC_APP_URL: "https://app.oneclass.ac.zw"
+  NEXT_PUBLIC_API_URL: "https://api.oneclass.ac.zw"
+  
+  # Feature flags
+  FEATURE_AI_ASSISTANCE: "true"
+  FEATURE_ADVANCED_REPORTING: "true"
+  FEATURE_MOBILE_APP: "true"
+  FEATURE_BULK_OPERATIONS: "true"
+  FEATURE_CUSTOM_DOMAINS: "true"
+  FEATURE_SSO: "true"
+  FEATURE_API_ACCESS: "true"
+  
+  # Monitoring
+  PROMETHEUS_ENABLED: "true"
+  METRICS_ENABLED: "true"
+  HEALTH_CHECK_ENABLED: "true"
+  
+  # Backup configuration
+  BACKUP_ENABLED: "true"
+  BACKUP_RETENTION_DAYS: "30"
+  BACKUP_SCHEDULE: "0 2 * * *"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: oneclass-platform
+  labels:
+    app.kubernetes.io/name: oneclass-platform
+    app.kubernetes.io/component: nginx-config
+data:
+  nginx.conf: |
+    user nginx;
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
+    
+    events {
+        worker_connections 1024;
+        use epoll;
+        multi_accept on;
+    }
+    
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+        
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for"';
+        
+        access_log /var/log/nginx/access.log main;
+        
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+        server_tokens off;
+        
+        gzip on;
+        gzip_vary on;
+        gzip_proxied any;
+        gzip_comp_level 6;
+        gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+        
+        upstream backend {
+            server backend:8000;
+        }
+        
+        upstream frontend {
+            server frontend:3000;
+        }
+        
+        server {
+            listen 80;
+            server_name *.oneclass.ac.zw;
+            
+            location / {
+                proxy_pass http://frontend;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            location /api/ {
+                proxy_pass http://backend;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+        }
+    }

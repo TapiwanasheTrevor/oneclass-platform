@@ -1,0 +1,167 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: oneclass-platform
+  labels:
+    app.kubernetes.io/name: oneclass-platform
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+        app.kubernetes.io/name: oneclass-platform
+        app.kubernetes.io/component: backend
+    spec:
+      containers:
+      - name: backend
+        image: oneclass/backend:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://oneclass:$(DB_PASSWORD)@postgres:5432/oneclass_production"
+        - name: REDIS_URL
+          value: "redis://:$(REDIS_PASSWORD)@redis:6379"
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: oneclass-secrets
+              key: DB_PASSWORD
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: oneclass-secrets
+              key: REDIS_PASSWORD
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: oneclass-secrets
+              key: JWT_SECRET
+        - name: CLERK_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: oneclass-secrets
+              key: CLERK_SECRET_KEY
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: oneclass-secrets
+              key: OPENAI_API_KEY
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: oneclass-secrets
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: oneclass-secrets
+              key: AWS_SECRET_ACCESS_KEY
+        - name: SENTRY_DSN
+          valueFrom:
+            secretKeyRef:
+              name: oneclass-secrets
+              key: SENTRY_DSN
+        envFrom:
+        - configMapRef:
+            name: oneclass-config
+        volumeMounts:
+        - name: backend-logs
+          mountPath: /app/logs
+        - name: backend-uploads
+          mountPath: /app/uploads
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: backend-logs
+        emptyDir: {}
+      - name: backend-uploads
+        persistentVolumeClaim:
+          claimName: backend-uploads-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: oneclass-platform
+  labels:
+    app.kubernetes.io/name: oneclass-platform
+    app.kubernetes.io/component: backend
+spec:
+  selector:
+    app: backend
+  ports:
+  - port: 8000
+    targetPort: 8000
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backend-uploads-pvc
+  namespace: oneclass-platform
+  labels:
+    app.kubernetes.io/name: oneclass-platform
+    app.kubernetes.io/component: backend-storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+  namespace: oneclass-platform
+  labels:
+    app.kubernetes.io/name: oneclass-platform
+    app.kubernetes.io/component: backend-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

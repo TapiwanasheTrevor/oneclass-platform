@@ -1,0 +1,4 @@
+# Test Script Requirements
+aiohttp==3.9.1
+colorama==0.4.6
+asyncio-mqtt==0.13.0

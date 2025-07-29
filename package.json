@@ -1,0 +1,84 @@
+{
+  "name": "oneclass-platform",
+  "version": "1.0.0",
+  "description": "Zimbabwe School Management Platform",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && python -m pytest services/finance/tests/ -v --cov=services/finance --cov-report=html --cov-report=term --cov-report=xml",
+    "test:frontend": "cd frontend && npm run test",
+    "test:e2e": "cd frontend && npm run test:e2e",
+    "test:coverage": "npm run test:backend:coverage && npm run test:frontend:coverage",
+    "test:backend:coverage": "cd backend && python -m pytest services/finance/tests/ --cov=services/finance --cov-report=html:htmlcov --cov-report=term --cov-report=xml:coverage.xml --cov-fail-under=80",
+    "test:frontend:coverage": "cd frontend && npm run test:coverage",
+    "test:finance": "npm run test:finance:backend && npm run test:finance:frontend",
+    "test:finance:backend": "cd backend && python -m pytest services/finance/tests/ -v --cov=services/finance --cov-report=html --cov-report=term",
+    "test:finance:frontend": "cd frontend && npm run test -- --testPathPattern=finance",
+    "test:finance:e2e": "cd frontend && npm run test:e2e -- --spec='**/payment-flow.spec.ts'",
+    "test:finance:unit": "cd backend && python -m pytest services/finance/tests/test_crud.py -v -m unit",
+    "test:finance:integration": "cd backend && python -m pytest services/finance/tests/test_api.py services/finance/tests/test_payment_integration.py -v -m integration",
+    "test:finance:performance": "cd backend && python -m pytest services/finance/tests/ -v -m slow",
+    "test:watch": "cd frontend && npm run test:watch",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && uvicorn main:app --reload --port 8000",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && python -m py_compile main.py",
+    "build:frontend": "cd frontend && npm run build",
+    "start": "npm run start:backend",
+    "start:backend": "cd backend && uvicorn main:app --port 8000",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "lint:backend": "cd backend && python -m flake8 services/finance/ --max-line-length=100",
+    "lint:frontend": "cd frontend && npm run lint",
+    "format": "npm run format:backend && npm run format:frontend",
+    "format:backend": "cd backend && python -m black services/finance/ && python -m isort services/finance/",
+    "format:frontend": "cd frontend && npm run format",
+    "type-check": "npm run type-check:backend && npm run type-check:frontend",
+    "type-check:backend": "cd backend && python -m mypy services/finance/",
+    "type-check:frontend": "cd frontend && npm run type-check",
+    "docs": "cd backend && python -m sphinx-build -b html docs docs/_build/html",
+    "docs:serve": "cd backend/docs/_build/html && python -m http.server 8080",
+    "db:migrate": "cd backend && python -m alembic upgrade head",
+    "db:rollback": "cd backend && python -m alembic downgrade -1",
+    "db:seed": "cd backend && python -m scripts.seed_data",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:test": "docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit",
+    "ci:test": "npm run test:coverage && npm run lint && npm run type-check",
+    "ci:build": "npm run build",
+    "ci:deploy": "npm run build && npm run docker:build"
+  },
+  "keywords": [
+    "school",
+    "management",
+    "zimbabwe",
+    "finance",
+    "billing",
+    "paynow",
+    "ecocash"
+  ],
+  "author": "OneClass Platform Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TapiwanasheTrevor/oneclass-platform.git"
+  },
+  "bugs": {
+    "url": "https://github.com/TapiwanasheTrevor/oneclass-platform/issues"
+  },
+  "homepage": "https://github.com/TapiwanasheTrevor/oneclass-platform#readme",
+  "dependencies": {
+    "@tanstack/react-query": "^5.83.0",
+    "@tanstack/react-query-devtools": "^5.83.0",
+    "axios": "^1.10.0"
+  }
+}

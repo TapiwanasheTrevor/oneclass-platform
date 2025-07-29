@@ -1,0 +1,13 @@
+INFO:main:API Gateway routes loaded successfully
+/opt/anaconda3/lib/python3.12/site-packages/pydantic/_internal/_config.py:341: UserWarning: Valid config keys have changed in V2:
+* 'orm_mode' has been renamed to 'from_attributes'
+  warnings.warn(message, UserWarning)
+WARNING:main:SIS module not available: No module named 'services.sis.models'
+INFO:main:Analytics & Reporting module loaded successfully
+WARNING:main:User Management module not available: cannot import name 'get_current_user' from 'shared.auth' (/Users/memimal/Desktop/PROJECTS/1CLASS PLATFORM/oneclass-platform/backend/shared/auth.py)
+INFO:     Started server process [13156]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+ERROR:    [Errno 48] error while attempting to bind on address ('127.0.0.1', 8001): address already in use
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
