@@ -156,7 +156,7 @@ class FeeCategoryResponse(FeeCategoryBase):
     updated_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class FeeStructureBase(BaseModel):
     """Base fee structure information"""
@@ -212,7 +212,7 @@ class FeeStructureResponse(FeeStructureBase):
     updated_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class FeeItemBase(BaseModel):
     """Base fee item information"""
@@ -266,7 +266,7 @@ class FeeItemResponse(FeeItemBase):
     updated_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class StudentFeeAssignmentBase(BaseModel):
     """Base student fee assignment"""
@@ -320,7 +320,7 @@ class StudentFeeAssignmentResponse(StudentFeeAssignmentBase):
     updated_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # =====================================================
 # INVOICE SCHEMAS
@@ -383,7 +383,7 @@ class InvoiceLineItemResponse(InvoiceLineItemBase):
     created_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class InvoiceResponse(InvoiceBase):
     """Invoice response"""
@@ -412,7 +412,7 @@ class InvoiceResponse(InvoiceBase):
     updated_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class BulkInvoiceGenerationRequest(BaseModel):
     """Schema for bulk invoice generation"""
@@ -496,7 +496,7 @@ class PaymentMethodResponse(PaymentMethodBase):
     updated_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class PaymentBase(BaseModel):
     """Base payment information"""
@@ -555,7 +555,7 @@ class PaymentResponse(PaymentBase):
     updated_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class PaymentAllocationBase(BaseModel):
     """Base payment allocation"""
@@ -575,7 +575,7 @@ class PaymentAllocationResponse(PaymentAllocationBase):
     created_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # =====================================================
 # PAYNOW INTEGRATION SCHEMAS
@@ -642,7 +642,7 @@ class FinancialSummaryResponse(FinancialSummaryBase):
     calculated_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class FinanceDashboardResponse(BaseModel):
     """Finance dashboard response"""

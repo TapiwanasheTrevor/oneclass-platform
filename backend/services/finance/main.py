@@ -9,7 +9,8 @@ from fastapi.responses import JSONResponse
 import logging
 from contextlib import asynccontextmanager
 
-from shared.auth import get_current_active_user, EnhancedUser
+from shared.auth import get_current_active_user
+from shared.models.platform_user import PlatformUser
 from shared.middleware import add_security_headers, log_requests
 from .routes import fee_management, invoices, payments, reports
 

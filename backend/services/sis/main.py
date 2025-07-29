@@ -10,7 +10,7 @@ from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import date, datetime
 import logging
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 # Import schemas and CRUD operations
 from .schemas import (
@@ -29,10 +29,11 @@ from .crud import (
 )
 
 # Import shared dependencies
-from shared.auth import get_current_active_user, User, require_permissions
-from shared.database import get_database_session
-from shared.file_upload import upload_file_to_s3, validate_file_type
-from shared.notifications import send_notification
+from shared.auth import get_current_active_user, require_permission
+from shared.models.platform_user import PlatformUser as User
+from shared.database import get_db
+from shared.file_storage import upload_file_to_s3, validate_file_type
+from shared.utils.notifications import send_notification
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -44,6 +45,19 @@ router = APIRouter(prefix="/api/v1/sis", tags=["Student Information System"])
 # =====================================================
 # UTILITY FUNCTIONS
 # =====================================================
+
+async def require_permissions(user: User, permissions: List[str]) -> bool:
+    """Check if user has any of the required permissions"""
+    if not user:
+        return False
+
+    # Super admin has all permissions
+    if "*" in getattr(user, 'permissions', []):
+        return True
+
+    # Check if user has any of the required permissions
+    user_permissions = getattr(user, 'permissions', [])
+    return any(perm in user_permissions for perm in permissions)
 
 def handle_sis_exceptions(func):
     """Decorator to handle SIS-specific exceptions."""
@@ -75,7 +89,7 @@ async def create_student(
     student_data: StudentCreate,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Register a new student in the system.
@@ -124,7 +138,7 @@ async def list_students(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(50, ge=1, le=200, description="Maximum number of records to return"),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Retrieve a list of students with optional filtering.
@@ -159,7 +173,7 @@ async def get_student(
     student_id: UUID,
     include_sensitive: bool = Query(False, description="Include medical and emergency contact data"),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Retrieve detailed information for a specific student.
@@ -198,7 +212,7 @@ async def update_student(
     student_update: StudentUpdate,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Update student information.
@@ -242,7 +256,7 @@ async def delete_student(
     student_id: UUID,
     hard_delete: bool = Query(False, description="Permanently delete student record"),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Delete a student record.
@@ -282,7 +296,7 @@ async def delete_student(
 async def search_students(
     search_request: StudentSearchRequest,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Advanced student search with filtering and pagination.
@@ -317,7 +331,7 @@ async def add_guardian_relationship(
     student_id: UUID,
     guardian_data: GuardianRelationshipCreate,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Create a guardian-student relationship.
@@ -346,7 +360,7 @@ async def add_guardian_relationship(
 async def get_student_guardians(
     student_id: UUID,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Get all guardians for a specific student.
@@ -370,7 +384,7 @@ async def create_disciplinary_incident(
     incident_data: DisciplinaryIncidentCreate,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Record a disciplinary incident for a student.
@@ -426,7 +440,7 @@ async def get_student_disciplinary_history(
     year: Optional[int] = Query(None, description="Filter by year"),
     severity: Optional[str] = Query(None, description="Filter by severity"),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Get disciplinary history for a student.
@@ -450,7 +464,7 @@ async def get_student_disciplinary_history(
 async def mark_attendance(
     attendance_data: AttendanceRecordCreate,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Mark student attendance for a specific period.
@@ -480,7 +494,7 @@ async def get_student_attendance(
     start_date: Optional[date] = Query(None, description="Start date for attendance records"),
     end_date: Optional[date] = Query(None, description="End date for attendance records"),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Get attendance records for a student within a date range.
@@ -509,7 +523,7 @@ async def create_health_record(
     health_data: HealthRecordCreate,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Create a health record for a student.
@@ -554,7 +568,7 @@ async def get_student_health_records(
     student_id: UUID,
     record_type: Optional[str] = Query(None, description="Filter by record type"),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Get health records for a student.
@@ -583,7 +597,7 @@ async def upload_student_document(
     access_level: str = Query("school", description="Access level"),
     description: Optional[str] = Query(None, description="Document description"),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Upload a document for a student.
@@ -646,7 +660,7 @@ async def get_student_documents(
     student_id: UUID,
     document_type: Optional[str] = Query(None, description="Filter by document type"),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Get documents for a student based on access level.
@@ -668,7 +682,7 @@ async def get_student_documents(
 async def get_student_summary(
     student_id: UUID,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Get comprehensive summary analytics for a student.
@@ -700,7 +714,7 @@ async def get_student_summary(
 async def get_class_overview(
     class_id: UUID,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_database_session)
+    db: Session = Depends(get_db)
 ):
     """
     Get overview analytics for a class.
@@ -788,26 +802,27 @@ async def send_health_notifications(
 # ERROR HANDLERS
 # =====================================================
 
-@router.exception_handler(StudentNotFoundError)
-async def student_not_found_handler(request, exc):
-    return JSONResponse(
-        status_code=404,
-        content={"detail": str(exc), "error_type": "student_not_found"}
-    )
+# Exception handlers can only be attached to the main FastAPI app, not routers
+# @router.exception_handler(StudentNotFoundError)
+# async def student_not_found_handler(request, exc):
+#     return JSONResponse(
+#         status_code=404,
+#         content={"detail": str(exc), "error_type": "student_not_found"}
+#     )
 
-@router.exception_handler(DuplicateStudentError)
-async def duplicate_student_handler(request, exc):
-    return JSONResponse(
-        status_code=409,
-        content={"detail": str(exc), "error_type": "duplicate_student"}
-    )
+# @router.exception_handler(DuplicateStudentError)
+# async def duplicate_student_handler(request, exc):
+#     return JSONResponse(
+#         status_code=409,
+#         content={"detail": str(exc), "error_type": "duplicate_student"}
+#     )
 
-@router.exception_handler(ClassCapacityExceededError)
-async def class_capacity_handler(request, exc):
-    return JSONResponse(
-        status_code=400,
-        content={"detail": str(exc), "error_type": "class_capacity_exceeded"}
-    )
+# @router.exception_handler(ClassCapacityExceededError)
+# async def class_capacity_handler(request, exc):
+#     return JSONResponse(
+#         status_code=400,
+#         content={"detail": str(exc), "error_type": "class_capacity_exceeded"}
+#     )
 
 # =====================================================
 # HEALTH CHECK ENDPOINT

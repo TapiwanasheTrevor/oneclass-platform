@@ -1,31 +1,72 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:15
-    environment:
-      POSTGRES_DB: oneclass_dev
-      POSTGRES_USER: oneclass
-      POSTGRES_PASSWORD: dev_password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./database/schemas:/docker-entrypoint-initdb.d
-
+  # Redis for caching (using Docker)
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
 
+  # Mail server for development
   mailhog:
     image: mailhog/mailhog
     ports:
       - "1025:1025"  # SMTP
       - "8025:8025"  # Web UI
+    restart: unless-stopped
+
+  # Backend API service
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - mailhog
+    environment:
+      - DATABASE_URL=postgresql://postgres:123Bubblegums@host.docker.internal:5432/oneclass
+      - REDIS_URL=redis://redis:6379
+      - SMTP_HOST=mailhog
+      - SMTP_PORT=1025
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    restart: unless-stopped
+    develop:
+      watch:
+        - action: sync
+          path: ./backend
+          target: /app
+
+  # Frontend Next.js app
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - WATCHPACK_POLLING=true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    restart: unless-stopped
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend
+          target: /app
+          ignore:
+            - node_modules/
+            - .next/
 
 volumes:
-  postgres_data:
   redis_data:

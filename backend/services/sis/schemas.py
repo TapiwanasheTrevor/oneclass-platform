@@ -123,7 +123,7 @@ class EmergencyContact(BaseModel):
 class MedicalCondition(BaseModel):
     """Medical condition information"""
     condition: str = Field(..., min_length=2, max_length=100)
-    severity: str = Field(..., regex=r'^(Mild|Moderate|Severe)$')
+    severity: str = Field(..., pattern=r'^(Mild|Moderate|Severe)$')
     medication: Optional[str] = Field(None, max_length=200)
     notes: Optional[str] = Field(None, max_length=500)
     diagnosed_date: Optional[date] = None
@@ -133,7 +133,7 @@ class Allergy(BaseModel):
     """Allergy information"""
     allergen: str = Field(..., min_length=2, max_length=100)
     reaction: str = Field(..., min_length=5, max_length=200)
-    severity: str = Field(..., regex=r'^(Mild|Moderate|Severe|Life-threatening)$')
+    severity: str = Field(..., pattern=r'^(Mild|Moderate|Severe|Life-threatening)$')
     epipen_required: bool = False
     treatment: Optional[str] = Field(None, max_length=200)
 
@@ -351,7 +351,7 @@ class StudentResponse(BaseModel):
     full_name: str = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
     @validator('full_name', always=True)
     def compute_full_name(cls, v, values):
@@ -411,7 +411,7 @@ class GuardianRelationshipResponse(BaseModel):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # =====================================================
 # DISCIPLINARY SCHEMAS
@@ -462,7 +462,7 @@ class DisciplinaryIncidentResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # =====================================================
 # ATTENDANCE SCHEMAS
@@ -495,7 +495,7 @@ class AttendanceRecordResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # =====================================================
 # HEALTH RECORD SCHEMAS
@@ -504,14 +504,14 @@ class AttendanceRecordResponse(BaseModel):
 class HealthRecordCreate(BaseModel):
     """Schema for creating health record"""
     student_id: UUID
-    record_type: str = Field(..., regex=r'^(checkup|illness|injury|vaccination|screening|medication_change)$')
+    record_type: str = Field(..., pattern=r'^(checkup|illness|injury|vaccination|screening|medication_change)$')
     record_date: date = Field(default_factory=date.today)
     recorded_by: str = Field(..., min_length=2, max_length=100)
     symptoms: Optional[str] = Field(None, max_length=500)
     diagnosis: Optional[str] = Field(None, max_length=500)
     treatment_given: Optional[str] = Field(None, max_length=500)
     temperature_celsius: Optional[float] = Field(None, ge=30, le=45)
-    blood_pressure: Optional[str] = Field(None, regex=r'^\d{2,3}/\d{2,3}$')
+    blood_pressure: Optional[str] = Field(None, pattern=r'^\d{2,3}/\d{2,3}$')
     pulse_rate: Optional[int] = Field(None, ge=40, le=200)
     weight_kg: Optional[float] = Field(None, ge=1, le=200)
     height_cm: Optional[int] = Field(None, ge=50, le=250)
@@ -539,7 +539,7 @@ class HealthRecordResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # =====================================================
 # DOCUMENT SCHEMAS
@@ -554,7 +554,7 @@ class StudentDocumentCreate(BaseModel):
     file_size_bytes: int = Field(..., gt=0)
     file_format: str = Field(..., min_length=2, max_length=10)
     is_confidential: bool = False
-    access_level: str = Field(default="school", regex=r'^(student|guardian|teacher|admin|school)$')
+    access_level: str = Field(default="school", pattern=r'^(student|guardian|teacher|admin|school)$')
     description: Optional[str] = Field(None, max_length=500)
     expiry_date: Optional[date] = None
 
@@ -578,7 +578,7 @@ class StudentDocumentResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # =====================================================
 # SEARCH AND FILTER SCHEMAS
@@ -601,8 +601,8 @@ class StudentSearchRequest(BaseModel):
     """Student search request"""
     search_query: Optional[str] = Field(None, min_length=2, max_length=100, description="Search in names and student number")
     filters: Optional[StudentSearchFilters] = None
-    sort_by: str = Field(default="last_name", regex=r'^(first_name|last_name|student_number|enrollment_date|grade_level)$')
-    sort_order: str = Field(default="asc", regex=r'^(asc|desc)$')
+    sort_by: str = Field(default="last_name", pattern=r'^(first_name|last_name|student_number|enrollment_date|grade_level)$')
+    sort_order: str = Field(default="asc", pattern=r'^(asc|desc)$')
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
 

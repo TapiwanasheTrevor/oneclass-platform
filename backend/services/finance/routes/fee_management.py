@@ -8,7 +8,9 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
 
-from shared.auth import get_current_active_user, EnhancedUser, require_permission, require_feature
+from shared.auth import get_current_active_user
+from shared.models.platform_user import PlatformUser, PlatformRole
+from shared.services.api_integration_service import require_permission
 from ..schemas import (
     FeeCategoryCreate, FeeCategoryUpdate, FeeCategoryResponse,
     FeeStructureCreate, FeeStructureUpdate, FeeStructureResponse,
@@ -26,16 +28,23 @@ router = APIRouter(prefix="/fee-management", tags=["fee-management"])
 
 @router.get("/categories", response_model=List[FeeCategoryResponse])
 @require_permission("finance.read")
-@require_feature("finance_module")
 async def get_fee_categories(
     active_only: bool = Query(True, description="Return only active categories"),
-    current_user: EnhancedUser = Depends(get_current_active_user)
+    current_user: PlatformUser = Depends(get_current_active_user)
 ):
     """
     Get all fee categories for the school.
     Automatically filtered by school context.
     """
-    categories = await FeeCategoryCRUD.get_fee_categories(current_user.school_id, active_only)
+    # Check if user has finance module access
+    if not current_user.can_access_feature("finance_module"):
+        raise HTTPException(status_code=403, detail="Finance module not available")
+    
+    school_id = current_user.primary_school_id
+    if not school_id:
+        raise HTTPException(status_code=400, detail="No school context available")
+    
+    categories = await FeeCategoryCRUD.get_fee_categories(school_id, active_only)
     return categories
 
 @router.get("/categories/{category_id}", response_model=FeeCategoryResponse)
