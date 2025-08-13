@@ -1,0 +1,162 @@
+{
+  "modules": {
+    "sis": {
+      "priority": 1,
+      "completion": 85,
+      "dependencies": [],
+      "agents": [
+        "Claude-DB",
+        "Claude-Backend",
+        "Claude-Frontend",
+        "Claude-Test"
+      ],
+      "tasks": {
+        "database": [
+          "Complete medical_records table",
+          "Add documents table",
+          "Create family_relationships constraints",
+          "Add Zimbabwe-specific validations"
+        ],
+        "backend": [
+          "Complete student CRUD operations",
+          "Implement family relationship management",
+          "Add bulk import/export functionality",
+          "Zimbabwe ID validation"
+        ],
+        "frontend": [
+          "Complete student profile components",
+          "Build enrollment workflow",
+          "Add search and filter functionality",
+          "Bulk operations interface"
+        ],
+        "testing": [
+          "Write unit tests for CRUD operations",
+          "Integration tests for workflows",
+          "E2E tests for enrollment"
+        ]
+      }
+    },
+    "academic": {
+      "priority": 2,
+      "completion": 20,
+      "dependencies": [
+        "sis"
+      ],
+      "agents": [
+        "Claude-Education",
+        "Claude-Backend",
+        "Claude-Frontend"
+      ],
+      "tasks": {
+        "education": [
+          "Map Zimbabwe curriculum structure",
+          "Define ZIMSEC requirements",
+          "Create three-term system logic"
+        ],
+        "backend": [
+          "Curriculum management APIs",
+          "Subject and class management",
+          "Teacher assignment system",
+          "Timetable generation"
+        ],
+        "frontend": [
+          "Curriculum management UI",
+          "Timetable builder",
+          "Teacher workload visualization",
+          "Subject allocation interface"
+        ]
+      }
+    },
+    "finance": {
+      "priority": 3,
+      "completion": 40,
+      "dependencies": [
+        "sis"
+      ],
+      "agents": [
+        "Claude-Finance",
+        "Claude-Backend",
+        "Claude-Frontend"
+      ],
+      "tasks": {
+        "finance": [
+          "Complete payment gateway integrations",
+          "Arrears management system",
+          "Financial reporting",
+          "Multi-currency support"
+        ],
+        "backend": [
+          "Invoice generation APIs",
+          "Payment processing",
+          "Financial analytics"
+        ],
+        "frontend": [
+          "Payment processing UI",
+          "Financial reports dashboard",
+          "Invoice management"
+        ]
+      }
+    },
+    "assessment": {
+      "priority": 4,
+      "completion": 0,
+      "dependencies": [
+        "academic"
+      ],
+      "agents": [
+        "Claude-Backend",
+        "Claude-Frontend",
+        "Claude-Education"
+      ],
+      "tasks": {
+        "backend": [
+          "Digital gradebook APIs",
+          "Assessment creation system",
+          "Grading calculations",
+          "Report card generation"
+        ],
+        "frontend": [
+          "Gradebook interface",
+          "Assessment builder",
+          "Report card templates",
+          "Grade entry forms"
+        ]
+      }
+    },
+    "attendance": {
+      "priority": 5,
+      "completion": 0,
+      "dependencies": [
+        "sis",
+        "academic"
+      ],
+      "agents": [
+        "Claude-Backend",
+        "Claude-Frontend"
+      ],
+      "tasks": {
+        "backend": [
+          "Daily attendance tracking",
+          "Attendance reports",
+          "Absence management",
+          "SMS notifications"
+        ],
+        "frontend": [
+          "Attendance marking interface",
+          "Reports dashboard",
+          "Absence tracking"
+        ]
+      }
+    }
+  },
+  "last_updated": "2025-08-12T19:13:16.215215",
+  "current_sprint": "Phase 1 - Core Academic Foundation",
+  "active_agents": [],
+  "completed_tasks": [
+    "Complete SIS student CRUD operations with Zimbabwe validation",
+    "Implement family relationship management system",
+    "Add bulk import/export functionality for students",
+    "Create comprehensive tests for SIS module (15 tests passing)"
+  ],
+  "blockers": []
+}

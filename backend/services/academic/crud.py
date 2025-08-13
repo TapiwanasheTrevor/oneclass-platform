@@ -26,8 +26,44 @@ from .schemas import (
     AttendanceStats, StudentPerformance, AcademicDashboard, TeacherDashboard,
     GradingScale, AttendanceStatus, AssessmentType, TermNumber
 )
-from core.exceptions import NotFoundError, ValidationError, DuplicateError
-from core.utils import validate_uuid, calculate_grade_points, get_zimbabwe_grade
+# Create custom exceptions since they don't exist in shared
+class NotFoundError(Exception):
+    pass
+
+class ValidationError(Exception):
+    pass
+    
+class DuplicateError(Exception):
+    pass
+
+# Create utility functions
+def validate_uuid(value):
+    """Validate UUID format"""
+    try:
+        UUID(str(value))
+        return True
+    except ValueError:
+        return False
+
+def get_zimbabwe_grade(percentage: float) -> str:
+    """Get Zimbabwe letter grade from percentage"""
+    if percentage >= 80:
+        return "A"
+    elif percentage >= 70:
+        return "B"
+    elif percentage >= 60:
+        return "C"
+    elif percentage >= 50:
+        return "D"
+    elif percentage >= 40:
+        return "E"
+    else:
+        return "U"
+
+def calculate_grade_points(letter_grade: str) -> Decimal:
+    """Calculate grade points from letter grade"""
+    grade_map = {"A": 4.0, "B": 3.0, "C": 2.0, "D": 1.0, "E": 0.5, "U": 0.0}
+    return Decimal(str(grade_map.get(letter_grade, 0.0)))
 
 logger = logging.getLogger(__name__)
 

@@ -272,7 +272,7 @@ class CurriculumUpdate(BaseModel):
     practical_periods: Optional[int] = Field(None, ge=0)
     effective_from: Optional[date] = None
     effective_to: Optional[date] = None
-    status: Optional[str] = Field(None, regex=r'^(draft|active|archived)$')
+    status: Optional[str] = Field(None, pattern=r'^(draft|active|archived)$')
     is_active: Optional[bool] = None
 
 
@@ -305,7 +305,7 @@ class PeriodBase(BaseModel):
     start_time: time
     end_time: time
     is_break: bool = False
-    break_type: Optional[str] = Field(None, regex=r'^(tea|lunch|assembly)$')
+    break_type: Optional[str] = Field(None, pattern=r'^(tea|lunch|assembly)$')
 
     @validator('end_time')
     def validate_time_order(cls, v, values):
@@ -326,7 +326,7 @@ class PeriodUpdate(BaseModel):
     start_time: Optional[time] = None
     end_time: Optional[time] = None
     is_break: Optional[bool] = None
-    break_type: Optional[str] = Field(None, regex=r'^(tea|lunch|assembly)$')
+    break_type: Optional[str] = Field(None, pattern=r'^(tea|lunch|assembly)$')
     is_active: Optional[bool] = None
 
 
@@ -354,7 +354,7 @@ class TimetableBase(BaseModel):
     room_number: Optional[str] = Field(None, max_length=20)
     is_double_period: bool = False
     is_practical: bool = False
-    week_pattern: str = Field(default="all", regex=r'^(all|odd|even)$')
+    week_pattern: str = Field(default="all", pattern=r'^(all|odd|even)$')
     effective_from: date
     effective_to: Optional[date] = None
     notes: Optional[str] = None
@@ -381,7 +381,7 @@ class TimetableUpdate(BaseModel):
     room_number: Optional[str] = Field(None, max_length=20)
     is_double_period: Optional[bool] = None
     is_practical: Optional[bool] = None
-    week_pattern: Optional[str] = Field(None, regex=r'^(all|odd|even)$')
+    week_pattern: Optional[str] = Field(None, pattern=r'^(all|odd|even)$')
     effective_from: Optional[date] = None
     effective_to: Optional[date] = None
     notes: Optional[str] = None
@@ -569,7 +569,7 @@ class AssessmentUpdate(BaseModel):
     resources_allowed: Optional[List[str]] = None
     is_group_assessment: Optional[bool] = None
     max_group_size: Optional[int] = Field(None, gt=1)
-    status: Optional[str] = Field(None, regex=r'^(draft|published|completed|cancelled)$')
+    status: Optional[str] = Field(None, pattern=r'^(draft|published|completed|cancelled)$')
     results_published: Optional[bool] = None
 
 
@@ -718,7 +718,7 @@ class LessonPlanUpdate(BaseModel):
     shared_with: Optional[List[UUID]] = None
     is_template: Optional[bool] = None
     template_category: Optional[str] = Field(None, max_length=50)
-    status: Optional[str] = Field(None, regex=r'^(draft|active|completed|archived)$')
+    status: Optional[str] = Field(None, pattern=r'^(draft|active|completed|archived)$')
 
 
 class LessonPlan(LessonPlanBase):
@@ -747,7 +747,7 @@ class CalendarEventBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
     event_type: EventType
-    event_category: str = Field(default="academic", regex=r'^(academic|administrative|social|sports|cultural)$')
+    event_category: str = Field(default="academic", pattern=r'^(academic|administrative|social|sports|cultural)$')
     start_date: date
     end_date: Optional[date] = None
     start_time: Optional[time] = None
@@ -812,7 +812,7 @@ class CalendarEventUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=200)
     description: Optional[str] = None
     event_type: Optional[EventType] = None
-    event_category: Optional[str] = Field(None, regex=r'^(academic|administrative|social|sports|cultural)$')
+    event_category: Optional[str] = Field(None, pattern=r'^(academic|administrative|social|sports|cultural)$')
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     start_time: Optional[time] = None
@@ -833,7 +833,7 @@ class CalendarEventUpdate(BaseModel):
     max_participants: Optional[int] = Field(None, gt=0)
     registration_required: Optional[bool] = None
     registration_deadline: Optional[date] = None
-    status: Optional[str] = Field(None, regex=r'^(scheduled|confirmed|cancelled|completed|postponed)$')
+    status: Optional[str] = Field(None, pattern=r'^(scheduled|confirmed|cancelled|completed|postponed)$')
 
 
 class CalendarEvent(CalendarEventBase):

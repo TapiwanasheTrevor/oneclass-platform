@@ -179,6 +179,67 @@ except ImportError as e:
         }
 
 
+# Include Academic Management module
+try:
+    from services.academic.main import router as academic_router
+    from services.academic.error_middleware import add_academic_error_middleware, setup_academic_exception_handlers
+
+    # Add Academic error handling middleware
+    add_academic_error_middleware(app)
+    setup_academic_exception_handlers(app)
+    
+    # Include academic routes
+    app.include_router(academic_router)
+
+    @app.get("/api/v1/academic/health")
+    async def academic_health():
+        """Academic module health check"""
+        return {
+            "status": "healthy",
+            "service": "academic",
+            "version": "1.0.0",
+            "timestamp": datetime.utcnow().isoformat(),
+            "module": "academic_management",
+            "features": [
+                "subject_management",
+                "curriculum_planning",
+                "timetable_scheduling",
+                "attendance_tracking",
+                "assessment_management",
+                "grade_calculation",
+                "lesson_planning",
+                "academic_calendar",
+                "performance_analytics",
+                "zimbabwe_compliance",
+                "comprehensive_error_handling",
+                "audit_logging",
+                "role_based_permissions"
+            ],
+            "zimbabwe_features": [
+                "three_term_system",
+                "a_to_u_grading_scale",
+                "primary_secondary_structure",
+                "cambridge_curriculum_support",
+                "zimsec_integration_ready"
+            ],
+        }
+
+    logger.info("Academic Management module with error handling loaded successfully")
+
+except ImportError as e:
+    logger.warning(f"Academic module not available: {e}")
+
+    @app.get("/api/v1/academic/health")
+    async def academic_health_fallback():
+        """Academic module health check fallback"""
+        return {
+            "status": "unavailable",
+            "service": "academic",
+            "error": "Module not loaded",
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+
 # Include Analytics & Reporting module
 try:
     from services.analytics.main import (

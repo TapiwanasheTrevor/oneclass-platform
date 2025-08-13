@@ -34,11 +34,11 @@ import {
 } from 'lucide-react'
 
 import { 
-  academicApi, 
-  Subject, 
-  SubjectCreate, 
-  SubjectUpdate, 
-  SubjectFilters 
+  useAcademicHooks,
+  type Subject, 
+  type SubjectCreate,
+  zimbabweGradeLevels,
+  formatGradeLevel
 } from '@/lib/academic-api'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -52,69 +52,33 @@ const DEPARTMENTS = ['Mathematics', 'Sciences', 'Languages', 'Humanities', 'Arts
 
 export function SubjectManagement({ className }: SubjectManagementProps) {
   const { user } = useAuth()
-  const queryClient = useQueryClient()
   
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filters, setFilters] = useState<SubjectFilters>({
-    page: 1,
-    page_size: 10
-  })
+  const [filterGrade, setFilterGrade] = useState<string>('')
+  const [filterDepartment, setFilterDepartment] = useState<string>('')
+  const [filterCore, setFilterCore] = useState<string>('')
 
-  // Fetch subjects
   const { 
-    data: subjectsResponse, 
-    isLoading, 
-    error 
-  } = useQuery({
-    queryKey: ['subjects', filters, searchTerm],
-    queryFn: () => academicApi.getSubjects({
-      ...filters,
-      ...(searchTerm && { search: searchTerm })
-    })
-  })
+    useSubjects, 
+    useCreateSubject, 
+    useUpdateSubject, 
+    useDeleteSubject 
+  } = useAcademicHooks()
 
-  // Create subject mutation
-  const createSubjectMutation = useMutation({
-    mutationFn: (data: SubjectCreate) => academicApi.createSubject(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subjects'] })
-      setIsCreateDialogOpen(false)
-      toast.success('Subject created successfully')
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to create subject')
-    }
-  })
+  // Build filter params
+  const filterParams = {
+    ...(filterGrade && { grade_level: parseInt(filterGrade) }),
+    ...(filterDepartment && { department: filterDepartment }),
+    ...(filterCore !== "" && { is_core: filterCore === "true" }),
+  }
 
-  // Update subject mutation
-  const updateSubjectMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: SubjectUpdate }) => 
-      academicApi.updateSubject(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subjects'] })
-      setIsEditDialogOpen(false)
-      setEditingSubject(null)
-      toast.success('Subject updated successfully')
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to update subject')
-    }
-  })
-
-  // Delete subject mutation
-  const deleteSubjectMutation = useMutation({
-    mutationFn: (id: string) => academicApi.deleteSubject(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subjects'] })
-      toast.success('Subject deleted successfully')
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to delete subject')
-    }
-  })
+  const { data: subjectsResponse, isLoading, error } = useSubjects(filterParams)
+  const createSubjectMutation = useCreateSubject()
+  const updateSubjectMutation = useUpdateSubject()
+  const deleteSubjectMutation = useDeleteSubject()
 
   const handleEdit = (subject: Subject) => {
     setEditingSubject(subject)
@@ -126,6 +90,25 @@ export function SubjectManagement({ className }: SubjectManagementProps) {
       deleteSubjectMutation.mutate(subject.id)
     }
   }
+
+  const handleCreateSubject = async (data: SubjectCreate) => {
+    await createSubjectMutation.mutateAsync(data)
+    setIsCreateDialogOpen(false)
+  }
+
+  const handleUpdateSubject = async (data: SubjectCreate) => {
+    if (!editingSubject) return
+    await updateSubjectMutation.mutateAsync({ id: editingSubject.id, data })
+    setIsEditDialogOpen(false)
+    setEditingSubject(null)
+  }
+
+  // Filter subjects based on search term
+  const filteredSubjects = subjectsResponse?.items?.filter((subject: Subject) => 
+    subject.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    subject.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    subject.department?.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || []
 
   const SubjectForm = ({ 
     subject, 
@@ -209,19 +192,44 @@ export function SubjectManagement({ className }: SubjectManagementProps) {
 
         <div className="space-y-2">
           <Label>Grade Levels *</Label>
-          <div className="grid grid-cols-6 gap-2">
-            {GRADE_LEVELS.map(level => (
-              <div key={level} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`grade-${level}`}
-                  checked={formData.grade_levels.includes(level)}
-                  onCheckedChange={(checked) => handleGradeLevelChange(level, checked as boolean)}
-                />
-                <Label htmlFor={`grade-${level}`} className="text-sm">
-                  Grade {level}
-                </Label>
+          <div className="space-y-4">
+            {/* Primary School */}
+            <div>
+              <h4 className="font-medium text-sm mb-2">Primary School (Grades 1-7)</h4>
+              <div className="grid grid-cols-4 gap-2">
+                {zimbabweGradeLevels.filter(g => g.category === 'Primary').map((grade) => (
+                  <div key={grade.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`grade-${grade.value}`}
+                      checked={formData.grade_levels.includes(grade.value)}
+                      onCheckedChange={(checked) => handleGradeLevelChange(grade.value, checked as boolean)}
+                    />
+                    <Label htmlFor={`grade-${grade.value}`} className="text-sm">
+                      {grade.label}
+                    </Label>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+
+            {/* Secondary School */}
+            <div>
+              <h4 className="font-medium text-sm mb-2">Secondary School (Forms 1-6)</h4>
+              <div className="grid grid-cols-3 gap-2">
+                {zimbabweGradeLevels.filter(g => g.category === 'Secondary').map((grade) => (
+                  <div key={grade.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`grade-${grade.value}`}
+                      checked={formData.grade_levels.includes(grade.value)}
+                      onCheckedChange={(checked) => handleGradeLevelChange(grade.value, checked as boolean)}
+                    />
+                    <Label htmlFor={`grade-${grade.value}`} className="text-sm">
+                      {grade.label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -368,7 +376,7 @@ export function SubjectManagement({ className }: SubjectManagementProps) {
               </DialogDescription>
             </DialogHeader>
             <SubjectForm
-              onSubmit={(data) => createSubjectMutation.mutate(data)}
+              onSubmit={handleCreateSubject}
               isLoading={createSubjectMutation.isPending}
             />
           </DialogContent>
@@ -399,21 +407,15 @@ export function SubjectManagement({ className }: SubjectManagementProps) {
             </div>
             <div className="space-y-2">
               <Label>Grade Level</Label>
-              <Select
-                value={filters.grade_level?.toString() || ''}
-                onValueChange={(value) => setFilters(prev => ({ 
-                  ...prev, 
-                  grade_level: value ? Number(value) : undefined 
-                }))}
-              >
+              <Select value={filterGrade} onValueChange={setFilterGrade}>
                 <SelectTrigger>
                   <SelectValue placeholder="All grades" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">All grades</SelectItem>
-                  {GRADE_LEVELS.map(level => (
-                    <SelectItem key={level} value={level.toString()}>
-                      Grade {level}
+                  {zimbabweGradeLevels.map(grade => (
+                    <SelectItem key={grade.value} value={grade.value.toString()}>
+                      {grade.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -421,13 +423,7 @@ export function SubjectManagement({ className }: SubjectManagementProps) {
             </div>
             <div className="space-y-2">
               <Label>Department</Label>
-              <Select
-                value={filters.department || ''}
-                onValueChange={(value) => setFilters(prev => ({ 
-                  ...prev, 
-                  department: value || undefined 
-                }))}
-              >
+              <Select value={filterDepartment} onValueChange={setFilterDepartment}>
                 <SelectTrigger>
                   <SelectValue placeholder="All departments" />
                 </SelectTrigger>
@@ -441,13 +437,7 @@ export function SubjectManagement({ className }: SubjectManagementProps) {
             </div>
             <div className="space-y-2">
               <Label>Type</Label>
-              <Select
-                value={filters.is_core?.toString() || ''}
-                onValueChange={(value) => setFilters(prev => ({ 
-                  ...prev, 
-                  is_core: value ? value === 'true' : undefined 
-                }))}
-              >
+              <Select value={filterCore} onValueChange={setFilterCore}>
                 <SelectTrigger>
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
@@ -467,7 +457,7 @@ export function SubjectManagement({ className }: SubjectManagementProps) {
         <CardHeader>
           <CardTitle className="flex items-center">
             <BookOpen className="h-5 w-5 mr-2" />
-            Subjects ({subjectsResponse?.total_count || 0})
+            Subjects ({filteredSubjects.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -497,7 +487,7 @@ export function SubjectManagement({ className }: SubjectManagementProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {subjectsResponse?.items.map((subject) => (
+                  {filteredSubjects.map((subject) => (
                     <TableRow key={subject.id}>
                       <TableCell className="font-medium">{subject.code}</TableCell>
                       <TableCell>{subject.name}</TableCell>
@@ -505,7 +495,7 @@ export function SubjectManagement({ className }: SubjectManagementProps) {
                         <div className="flex flex-wrap gap-1">
                           {subject.grade_levels.slice(0, 3).map(level => (
                             <Badge key={level} variant="outline" className="text-xs">
-                              {level}
+                              {formatGradeLevel(level)}
                             </Badge>
                           ))}
                           {subject.grade_levels.length > 3 && (
@@ -551,32 +541,16 @@ export function SubjectManagement({ className }: SubjectManagementProps) {
                 </TableBody>
               </Table>
 
-              {/* Pagination */}
-              {subjectsResponse && subjectsResponse.total_pages > 1 && (
-                <div className="flex items-center justify-between pt-4">
-                  <div className="text-sm text-muted-foreground">
-                    Showing {((filters.page || 1) - 1) * (filters.page_size || 10) + 1} to{' '}
-                    {Math.min((filters.page || 1) * (filters.page_size || 10), subjectsResponse.total_count)} of{' '}
-                    {subjectsResponse.total_count} subjects
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setFilters(prev => ({ ...prev, page: (prev.page || 1) - 1 }))}
-                      disabled={!subjectsResponse.has_previous}
-                    >
-                      Previous
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setFilters(prev => ({ ...prev, page: (prev.page || 1) + 1 }))}
-                      disabled={!subjectsResponse.has_next}
-                    >
-                      Next
-                    </Button>
-                  </div>
+              {filteredSubjects.length === 0 && !isLoading && (
+                <div className="text-center py-8">
+                  <BookOpen className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No subjects found</h3>
+                  <p className="text-muted-foreground mb-4">
+                    {searchTerm || filterGrade || filterDepartment || filterCore
+                      ? "Try adjusting your filters or search term."
+                      : "Get started by creating your first subject."
+                    }
+                  </p>
                 </div>
               )}
             </>
@@ -596,10 +570,7 @@ export function SubjectManagement({ className }: SubjectManagementProps) {
           {editingSubject && (
             <SubjectForm
               subject={editingSubject}
-              onSubmit={(data) => updateSubjectMutation.mutate({ 
-                id: editingSubject.id, 
-                data 
-              })}
+              onSubmit={handleUpdateSubject}
               isLoading={updateSubjectMutation.isPending}
             />
           )}

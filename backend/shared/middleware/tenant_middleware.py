@@ -12,7 +12,8 @@ import logging
 from datetime import datetime
 
 from shared.models.platform import School
-from shared.auth import verify_token, UserSession, db_manager
+from shared.auth import verify_token, validate_token, UserSession, db_manager
+from shared.database import set_current_school_id
 
 logger = logging.getLogger(__name__)
 
@@ -190,37 +191,17 @@ class TenantMiddleware(BaseHTTPMiddleware):
             )
     
     async def _extract_tenant_context(self, request: Request) -> Optional[TenantContext]:
-        """Extract tenant context from request headers"""
-        # Try to get school context from headers (injected by frontend middleware)
-        school_id = request.headers.get('X-School-ID')
-        school_name = request.headers.get('X-School-Name')
-        subdomain = request.headers.get('X-School-Subdomain')
-        subscription_tier = request.headers.get('X-School-Tier')
-        
-        if school_id and school_name and subdomain:
-            # Get enabled modules (may need to fetch from database)
-            enabled_modules = await self._get_school_modules(school_id)
-            
-            # Extract user session if available
-            user_session = await self._extract_user_session(request)
-            
-            return TenantContext(
-                school_id=school_id,
-                school_name=school_name,
-                subdomain=subdomain,
-                subscription_tier=subscription_tier or 'basic',
-                enabled_modules=enabled_modules,
-                user_session=user_session
-            )
-        
-        # Fallback: try to extract from subdomain in host header
+        """Extract tenant context from trusted sources only (Host/JWT)."""
+        # Do NOT trust client-provided X-* headers for tenant resolution
+
+        # 1) Extract from subdomain in host header (primary)
         host = request.headers.get('host', '')
         subdomain = self._extract_subdomain_from_host(host)
 
         if subdomain:
             return await self._get_tenant_by_subdomain(subdomain, request)
 
-        # Final fallback: try to extract from JWT token
+        # 2) Fallback: try to extract from JWT token (must be validated later)
         jwt_context = await self._extract_from_jwt_token(request)
         if jwt_context:
             return jwt_context
@@ -239,15 +220,9 @@ class TenantMiddleware(BaseHTTPMiddleware):
             if not auth_header or not auth_header.startswith('Bearer '):
                 return None
 
-            # Extract token
+            # Extract and validate token
             token = auth_header.split(' ')[1]
-
-            # Decode JWT token (without verification for now, just to extract payload)
-            import jwt
-            import json
-
-            # Decode without verification to get payload
-            payload = jwt.decode(token, options={"verify_signature": False})
+            payload = await validate_token(token)
 
             # Extract school information from JWT
             school_id = payload.get('school_id')
@@ -274,12 +249,13 @@ class TenantMiddleware(BaseHTTPMiddleware):
                 # Get enabled modules for this school
                 enabled_modules = await self._get_school_modules(school_id)
 
-                # Create user session from JWT payload
+                # Create user session from JWT payload (minimal; full context via verify_token elsewhere)
                 user_session = UserSession(
                     user_id=payload.get('sub'),
-                    user_role=payload.get('school_role', 'student'),
-                    user_permissions=[],  # Will be populated later
-                    user_features=[]
+                    role=payload.get('school_role', 'student'),
+                    permissions=[],
+                    features=[],
+                    school_id=school_id
                 )
 
                 return TenantContext(
@@ -297,30 +273,8 @@ class TenantMiddleware(BaseHTTPMiddleware):
             return None
 
     async def _extract_user_session(self, request: Request) -> Optional[UserSession]:
-        """Extract user session from request"""
-        # Try to get from headers first (injected by frontend middleware)
-        user_id = request.headers.get('X-User-ID')
-        user_role = request.headers.get('X-User-Role')
-        user_permissions = request.headers.get('X-User-Permissions')
-        user_features = request.headers.get('X-User-Features')
-        
-        if user_id and user_role:
-            try:
-                import json
-                permissions = json.loads(user_permissions) if user_permissions else []
-                features = json.loads(user_features) if user_features else []
-                
-                return UserSession(
-                    user_id=user_id,
-                    role=user_role,
-                    permissions=permissions,
-                    features=features,
-                    school_id=request.headers.get('X-School-ID')
-                )
-            except (json.JSONDecodeError, TypeError):
-                pass
-        
-        # Fallback: try to extract from Authorization header or cookies
+        """Extract user session from Authorization token or secure cookie only."""
+        # Only accept Authorization or secure cookie, not client-provided headers
         auth_header = request.headers.get('Authorization')
         if auth_header and auth_header.startswith('Bearer '):
             token = auth_header[7:]
@@ -402,13 +356,8 @@ class TenantMiddleware(BaseHTTPMiddleware):
             ]
     
     async def _setup_database_context(self, request: Request, tenant_context: TenantContext):
-        """Set up database context for Row Level Security"""
-        # This would set RLS context variables
-        # Implementation depends on your database setup
-        request.state.db_context = {
-            'school_id': tenant_context.school_id,
-            'user_id': tenant_context.user_session.user_id if tenant_context.user_session else None
-        }
+        """Set up database context for Row Level Security by setting contextvar."""
+        set_current_school_id(tenant_context.school_id)
     
     async def _validate_platform_admin(self, request: Request):
         """Validate platform admin access"""

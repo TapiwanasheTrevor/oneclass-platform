@@ -14,7 +14,7 @@ from typing import Optional, Dict, Any
 import bcrypt
 import jwt
 import logging
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 from shared.database import get_async_session
 from shared.models.platform_user import (
@@ -24,7 +24,7 @@ from shared.models.platform_user import (
 )
 from shared.models.platform import School
 from shared.middleware.tenant_middleware import get_tenant_context, TenantContext
-from shared.auth import db_manager
+from shared.auth import db_manager, validate_token, create_access_token as create_context_token
 from .schemas import (
     LoginRequest,
     LoginResponse,
@@ -654,53 +654,50 @@ async def complete_onboarding(
 async def switch_school(
     school_id: str,
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_async_session),
 ):
     """
-    Switch user's current school context
+    Switch user's current school context and return a fresh access token with updated context.
     """
     try:
-        # Verify token
-        payload = verify_token(credentials.credentials)
-        user_id = payload.get("sub")
-        session_id = payload.get("session_id")
+        # Validate token and get user id
+        token_data = await validate_token(credentials.credentials)
+        user_id = token_data.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-        # Verify user has access to the school
-        membership_query = select(SchoolMembership).where(
-            and_(
-                SchoolMembership.user_id == user_id,
-                SchoolMembership.school_id == school_id,
-                SchoolMembership.status == "active",
-            )
-        )
-        membership_result = await db.execute(membership_query)
-        membership = membership_result.scalar_one_or_none()
+        # Verify user has access to the school (using consolidated schema)
+        async with db_manager.get_connection() as conn:
+            membership_query = """
+                SELECT 1
+                FROM platform.school_memberships
+                WHERE user_id = $1 AND school_id = $2 AND status = 'active'
+            """
+            has_access = await conn.fetchval(membership_query, UUID(user_id), UUID(school_id))
+            if not has_access:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this school")
 
-        if not membership:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied to this school",
-            )
+        # Issue new access token scoped to selected school
+        new_access_token = create_access_token(user_id, school_id)
 
-        # Update session's current school
-        if session_id:
-            session_query = select(UserSession).where(UserSession.id == session_id)
-            session_result = await db.execute(session_query)
-            session = session_result.scalar_one_or_none()
-
-            if session:
-                session.school_id = school_id
-                session.last_activity = datetime.utcnow()
-
-        await db.commit()
-
-        # Get updated user context
-        user_context = await auth_service.get_user_with_context(db, user_id)
+        # Optionally: fetch minimal current school context to return
+        async with db_manager.get_connection() as conn:
+            school_query = """
+                SELECT name, subdomain, subscription_tier
+                FROM platform.schools
+                WHERE id = $1
+            """
+            school_row = await conn.fetchrow(school_query, UUID(school_id))
+            current_school = {
+                "school_id": school_id,
+                "school_name": school_row["name"] if school_row else None,
+                "subdomain": school_row["subdomain"] if school_row else None,
+                "subscription_tier": school_row["subscription_tier"] if school_row else None,
+            }
 
         return {
             "message": "School context switched successfully",
-            "current_school_id": school_id,
-            "user": user_context,
+            "access_token": new_access_token,
+            "current_school": current_school,
         }
 
     except HTTPException:

@@ -44,6 +44,7 @@ except ImportError:
     # For testing without asyncpg
     asyncpg = None
 from contextlib import asynccontextmanager
+from shared.database import get_current_school_id
 
 # Configuration
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/oneclass")
@@ -81,7 +82,22 @@ class DatabaseManager:
             await self.initialize()
         
         async with self.pool.acquire() as connection:
-            yield connection
+            # Apply tenant RLS GUC for this connection if available
+            school_id = get_current_school_id()
+            if school_id:
+                try:
+                    await connection.execute("SET app.current_school_id = $1", school_id)
+                except Exception:
+                    # Do not fail request on context set failure
+                    pass
+            try:
+                yield connection
+            finally:
+                # Reset GUC to avoid leaks between requests
+                try:
+                    await connection.execute("RESET app.current_school_id")
+                except Exception:
+                    pass
 
 # Global database manager instance
 db_manager = DatabaseManager()
@@ -430,6 +446,59 @@ async def get_school_subscription_tier(school_id: UUID) -> str:
         query = "SELECT subscription_tier FROM platform.schools WHERE id = $1"
         result = await conn.fetchval(query, school_id)
         return result or "basic"
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> "UnifiedUser":
+    """Alias for get_current_active_user for compatibility"""
+    from .models.unified_user import UnifiedUser
+    
+    # This is a simplified version - in production, implement full user lookup
+    user = await get_current_active_user(credentials)
+    
+    # Convert PlatformUser to UnifiedUser for compatibility
+    # This is a temporary bridge until unified
+    return UnifiedUser(
+        id=user.id,
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        global_role=user.platform_role.value if hasattr(user.platform_role, 'value') else str(user.platform_role),
+        status="active"
+    )
+
+
+async def require_super_admin(
+    current_user: "UnifiedUser" = Depends(get_current_user)
+) -> "UnifiedUser":
+    """Require super admin permissions"""
+    from .models.unified_user import GlobalRole
+    
+    if not current_user.global_role or current_user.global_role not in [
+        GlobalRole.SUPER_ADMIN.value, 
+        GlobalRole.PLATFORM_ADMIN.value
+    ]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super admin permissions required"
+        )
+    
+    return current_user
+
+
+async def get_current_school_context(
+    current_user: "UnifiedUser" = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Get current school context for the user"""
+    
+    # This is a simplified version - in production would determine current school
+    # based on subdomain, user selection, or other context
+    return {
+        "school_id": "default-school-id",
+        "school_name": "Default School",
+        "user_role": "principal"  # or actual role
+    }
+
 
 async def get_websocket_user(token: Optional[str]) -> Optional[PlatformUser]:
     """

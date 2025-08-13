@@ -1,7 +1,7 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { getCurrentSubdomain, isMainPlatform, getSchoolFromSubdomain } from '@/utils/subdomain';
+import { getCurrentSubdomain, getSchoolFromSubdomain, isMainPlatform } from '@/utils/subdomain';
+import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
 interface TenantInfo {
   subdomain: string;
@@ -58,33 +58,15 @@ export function TenantProvider({ children }: TenantProviderProps) {
         throw new Error('No subdomain detected');
       }
 
-      // Try to fetch school information from API
-      try {
-        const schoolInfo = await getSchoolFromSubdomain(subdomain);
-        if (schoolInfo) {
-          setTenant({
-            subdomain: schoolInfo.subdomain,
-            schoolName: schoolInfo.schoolName,
-            schoolId: schoolInfo.schoolId,
-            isMainPlatform: false,
-          });
-          return;
-        }
-      } catch (apiError) {
-        console.warn('API call failed, using fallback school info:', apiError);
+      // Fetch school information from API (authoritative)
+      const schoolInfo = await getSchoolFromSubdomain(subdomain);
+      if (!schoolInfo) {
+        throw new Error('School not found for subdomain');
       }
-
-      // Fallback: Create tenant info from subdomain
-      // This allows the app to work even if the API is not available
-      const fallbackSchoolName = subdomain
-        .split('-')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-
       setTenant({
-        subdomain: subdomain,
-        schoolName: fallbackSchoolName,
-        schoolId: 'fallback-' + subdomain, // Temporary ID
+        subdomain: schoolInfo.subdomain,
+        schoolName: schoolInfo.schoolName,
+        schoolId: schoolInfo.schoolId,
         isMainPlatform: false,
       });
 
@@ -105,33 +87,7 @@ export function TenantProvider({ children }: TenantProviderProps) {
     loadTenantInfo();
   }, []);
 
-  // Add tenant info to API requests
-  useEffect(() => {
-    if (tenant && !tenant.isMainPlatform) {
-      // Set default headers for API requests
-      const originalFetch = window.fetch;
-      window.fetch = function(input: RequestInfo | URL, init?: RequestInit) {
-        const headers = new Headers(init?.headers);
-
-        // Only set real school ID if it's not a fallback
-        if (!tenant.schoolId.startsWith('fallback-')) {
-          headers.set('X-School-ID', tenant.schoolId);
-        }
-        headers.set('X-School-Name', tenant.schoolName);
-        headers.set('X-School-Subdomain', tenant.subdomain);
-
-        return originalFetch(input, {
-          ...init,
-          headers,
-        });
-      };
-
-      // Cleanup on unmount
-      return () => {
-        window.fetch = originalFetch;
-      };
-    }
-  }, [tenant]);
+  // Do not inject tenant headers from client; backend derives from Host/JWT
 
   const value: TenantContextType = {
     tenant,

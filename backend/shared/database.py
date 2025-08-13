@@ -7,9 +7,12 @@ import os
 from sqlalchemy import create_engine, MetaData
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
+from typing import Generator, AsyncGenerator, Optional
 from sqlalchemy.pool import QueuePool
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker as async_sessionmaker
+from sqlalchemy import text
+from contextvars import ContextVar
 import logging
 
 logger = logging.getLogger(__name__)
@@ -40,7 +43,7 @@ Base = declarative_base()
 metadata = MetaData()
 
 
-def get_db() -> Session:
+def get_db() -> Generator[Session, None, None]:
     """
     Dependency to get database session
     """
@@ -142,10 +145,44 @@ AsyncSessionLocal = async_sessionmaker(
     bind=async_engine, class_=AsyncSession, expire_on_commit=False
 )
 
+# Context variable to carry the current tenant (school) across the request
+_current_school_id: ContextVar[str | None] = ContextVar("current_school_id", default=None)
 
-async def get_async_session() -> AsyncSession:
-    """
-    Dependency to get async database session
-    """
+
+def set_current_school_id(school_id: str | None) -> None:
+    """Set the current tenant school id for the active context."""
+    _current_school_id.set(school_id)
+
+
+def get_current_school_id() -> str | None:
+    """Get the current tenant school id for the active context."""
+    return _current_school_id.get()
+
+
+async def _apply_rls_context(session: AsyncSession, school_id: str | None) -> None:
+    """Apply Postgres GUC for row-level security if a school id is available."""
+    if not school_id:
+        return
+    try:
+        await session.execute(text("SET app.current_school_id = :school_id"), {"school_id": school_id})
+    except Exception as e:
+        logger.warning(f"Failed to set RLS context (school_id={school_id}): {e}")
+
+
+async def _reset_rls_context(session: AsyncSession) -> None:
+    """Reset Postgres GUC to avoid leaking tenant context between requests."""
+    try:
+        await session.execute(text("RESET app.current_school_id"))
+    except Exception as e:
+        logger.warning(f"Failed to reset RLS context: {e}")
+
+
+async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+    """Dependency to get async database session with tenant-aware RLS context."""
     async with AsyncSessionLocal() as session:
-        yield session
+        school_id = get_current_school_id()
+        await _apply_rls_context(session, school_id)
+        try:
+            yield session
+        finally:
+            await _reset_rls_context(session)

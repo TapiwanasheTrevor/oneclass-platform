@@ -13,8 +13,23 @@ from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.sql import func
 
-from core.database import Base
-from core.models import AuditMixin, SoftDeleteMixin
+from shared.database import Base
+# Create audit mixins since they don't exist in shared.models
+from sqlalchemy import Column, DateTime
+from sqlalchemy.sql import func
+from uuid import UUID, uuid4
+
+class AuditMixin:
+    """Audit mixin for tracking creation and updates"""
+    created_by = Column("created_by", String(255), nullable=True)
+    updated_by = Column("updated_by", String(255), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class SoftDeleteMixin:
+    """Soft delete mixin"""
+    is_active = Column(Boolean, default=True, nullable=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
 
 # =====================================================
 # SUBJECT MODELS

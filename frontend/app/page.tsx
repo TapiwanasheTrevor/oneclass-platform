@@ -129,7 +129,7 @@ export default function LandingPage() {
       name: "Mrs. Sarah Chikwanha",
       role: "Headmaster, Harare Primary School",
       content:
-        "1Class has transformed how we manage our school. Fee collection is now 95% automated and our teachers love the lesson planning tools.",
+        "OneClass has transformed how we manage our school. Fee collection is now 95% automated and our teachers love the lesson planning tools.",
       rating: 5,
     },
     {
@@ -210,7 +210,7 @@ export default function LandingPage() {
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center space-x-2">
               <GraduationCap className="h-8 w-8 text-primary" />
-              <span className="text-2xl font-bold">1Class</span>
+              <span className="text-2xl font-bold">OneClass</span>
             </div>
 
             {/* Desktop Navigation */}
@@ -412,7 +412,7 @@ export default function LandingPage() {
         <div className="container mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Trusted by Schools Across Zimbabwe</h2>
-            <p className="text-xl text-muted-foreground">See what educators are saying about 1Class</p>
+            <p className="text-xl text-muted-foreground">See what educators are saying about OneClass</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -512,7 +512,7 @@ export default function LandingPage() {
         <div className="container mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Transform Your School?</h2>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Join hundreds of schools already using 1Class to streamline their operations and improve student outcomes.
+            Join hundreds of schools already using OneClass to streamline their operations and improve student outcomes.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/onboarding">
@@ -535,7 +535,7 @@ export default function LandingPage() {
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <GraduationCap className="h-6 w-6 text-primary" />
-                <span className="text-xl font-bold">1Class</span>
+                <span className="text-xl font-bold">OneClass</span>
               </div>
               <p className="text-muted-foreground">
                 The complete school management platform built for Zimbabwean schools.
@@ -594,7 +594,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="border-t mt-8 pt-8 text-center text-muted-foreground">
-            <p>&copy; 2024 1Class. All rights reserved.</p>
+            <p>&copy; 2024 OneClass. All rights reserved.</p>
           </div>
         </div>
       </footer>

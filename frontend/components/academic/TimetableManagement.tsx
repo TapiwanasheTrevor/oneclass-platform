@@ -1,50 +1,78 @@
-/**
- * Timetable Management Component
- * Comprehensive timetable scheduling with conflict detection
- */
+"use client"
 
-'use client'
-
-import React, { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { toast } from 'sonner'
-import {
-  Plus,
-  Clock,
-  Calendar,
-  Users,
+import { useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Checkbox } from "@/components/ui/checkbox"
+import { 
+  Plus, 
+  Clock, 
+  Calendar, 
+  Users, 
   BookOpen,
   MapPin,
   AlertTriangle,
-  Save,
   Edit,
   Trash2,
   Copy,
-  Download,
-  RefreshCw
-} from 'lucide-react'
+  Save,
+  RefreshCw,
+  Coffee,
+  Utensils,
+  GraduationCap
+} from "lucide-react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { toast } from "sonner"
 
 import { 
-  academicApi, 
-  Period,
-  PeriodCreate,
-  Timetable,
-  TimetableCreate,
-  TimetableWithDetails,
-  TermNumber 
-} from '@/lib/academic-api'
-import { useAuth } from '@/hooks/useAuth'
-import { formatTime } from '@/lib/utils'
+  useAcademicHooks,
+  type Period,
+  type PeriodCreate,
+  type Timetable,
+  type TimetableCreate,
+  zimbabweTerms,
+  formatTerm
+} from "@/lib/academic-api"
+
+const periodSchema = z.object({
+  period_number: z.number().min(1, "Period number must be at least 1"),
+  name: z.string().min(1, "Period name is required").max(50),
+  start_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format"),
+  end_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format"),
+  is_break: z.boolean().default(false),
+  break_type: z.enum(["tea", "lunch", "assembly"]).optional(),
+})
+
+const timetableSchema = z.object({
+  academic_year_id: z.string().min(1, "Academic year is required"),
+  term_number: z.number().min(1).max(3),
+  class_id: z.string().min(1, "Class is required"),
+  subject_id: z.string().min(1, "Subject is required"),
+  teacher_id: z.string().min(1, "Teacher is required"),
+  period_id: z.string().min(1, "Period is required"),
+  day_of_week: z.number().min(1).max(6),
+  room_number: z.string().optional(),
+  is_double_period: z.boolean().default(false),
+  is_practical: z.boolean().default(false),
+  week_pattern: z.enum(["all", "odd", "even"]).default("all"),
+  effective_from: z.string(),
+  effective_to: z.string().optional(),
+  notes: z.string().optional(),
+})
+
+type PeriodFormData = z.infer<typeof periodSchema>
+type TimetableFormData = z.infer<typeof timetableSchema>
 
 interface TimetableManagementProps {
   academicYearId: string
@@ -66,596 +94,181 @@ const WEEK_PATTERNS = [
   { value: 'even', label: 'Even Weeks' }
 ]
 
-export function TimetableManagement({ academicYearId, className }: TimetableManagementProps) {
-  const { user } = useAuth()
-  const queryClient = useQueryClient()
-  
-  const [selectedTerm, setSelectedTerm] = useState<TermNumber>(TermNumber.TERM_1)
-  const [selectedClass, setSelectedClass] = useState<string>('')
-  const [isCreatePeriodOpen, setIsCreatePeriodOpen] = useState(false)
-  const [isCreateTimetableOpen, setIsCreateTimetableOpen] = useState(false)
-  const [viewMode, setViewMode] = useState<'week' | 'teacher' | 'room'>('week')
+export default function TimetableManagement({ academicYearId, className }: TimetableManagementProps) {
+  const [selectedTerm, setSelectedTerm] = useState(1)
+  const [selectedView, setSelectedView] = useState<'week' | 'teacher' | 'room'>('week')
+  const [isPeriodDialogOpen, setIsPeriodDialogOpen] = useState(false)
+  const [isTimetableDialogOpen, setIsTimetableDialogOpen] = useState(false)
 
-  // Mock data - in real app, this would come from APIs
-  const mockPeriods: Period[] = [
-    {
-      id: '1',
-      school_id: user?.school_id || '',
-      period_number: 1,
-      name: 'Period 1',
-      start_time: '08:00',
-      end_time: '08:40',
-      is_break: false,
-      is_active: true,
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z',
-      created_by: user?.id || ''
-    },
-    {
-      id: '2',
-      school_id: user?.school_id || '',
-      period_number: 2,
-      name: 'Period 2',
-      start_time: '08:40',
-      end_time: '09:20',
-      is_break: false,
-      is_active: true,
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z',
-      created_by: user?.id || ''
-    },
-    {
-      id: '3',
-      school_id: user?.school_id || '',
-      period_number: 3,
-      name: 'Tea Break',
-      start_time: '09:20',
-      end_time: '09:40',
-      is_break: true,
-      break_type: 'tea',
-      is_active: true,
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z',
-      created_by: user?.id || ''
-    },
-    {
-      id: '4',
-      school_id: user?.school_id || '',
-      period_number: 4,
-      name: 'Period 3',
-      start_time: '09:40',
-      end_time: '10:20',
-      is_break: false,
-      is_active: true,
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z',
-      created_by: user?.id || ''
-    },
-    {
-      id: '5',
-      school_id: user?.school_id || '',
-      period_number: 5,
-      name: 'Period 4',
-      start_time: '10:20',
-      end_time: '11:00',
-      is_break: false,
-      is_active: true,
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z',
-      created_by: user?.id || ''
-    },
-    {
-      id: '6',
-      school_id: user?.school_id || '',
-      period_number: 6,
-      name: 'Lunch Break',
-      start_time: '11:00',
-      end_time: '12:00',
-      is_break: true,
-      break_type: 'lunch',
-      is_active: true,
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z',
-      created_by: user?.id || ''
-    },
-    {
-      id: '7',
-      school_id: user?.school_id || '',
-      period_number: 7,
-      name: 'Period 5',
-      start_time: '12:00',
-      end_time: '12:40',
-      is_break: false,
-      is_active: true,
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z',
-      created_by: user?.id || ''
-    },
-    {
-      id: '8',
-      school_id: user?.school_id || '',
-      period_number: 8,
-      name: 'Period 6',
-      start_time: '12:40',
-      end_time: '13:20',
-      is_break: false,
-      is_active: true,
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z',
-      created_by: user?.id || ''
-    }
-  ]
+  const { 
+    usePeriods, 
+    useCreatePeriod,
+    useCreateTimetable,
+    useSubjects
+  } = useAcademicHooks()
 
-  const mockTimetableEntries: TimetableWithDetails[] = [
-    {
-      id: '1',
-      school_id: user?.school_id || '',
-      academic_year_id: academicYearId,
-      term_number: 1,
-      class_id: 'class1',
-      subject_id: 'math',
-      teacher_id: 'teacher1',
-      period_id: '1',
-      day_of_week: 1,
-      room_number: 'Room 101',
-      is_double_period: false,
-      is_practical: false,
-      week_pattern: 'all',
-      effective_from: '2024-01-15',
-      is_active: true,
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z',
-      created_by: user?.id || '',
-      subject_name: 'Mathematics',
-      teacher_name: 'Mr. Mukamuri',
-      period_name: 'Period 1',
-      class_name: 'Form 4A',
-      start_time: '08:00',
-      end_time: '08:40'
-    },
-    {
-      id: '2',
-      school_id: user?.school_id || '',
-      academic_year_id: academicYearId,
-      term_number: 1,
-      class_id: 'class1',
-      subject_id: 'english',
-      teacher_id: 'teacher2',
-      period_id: '2',
-      day_of_week: 1,
-      room_number: 'Room 102',
-      is_double_period: false,
-      is_practical: false,
-      week_pattern: 'all',
-      effective_from: '2024-01-15',
-      is_active: true,
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z',
-      created_by: user?.id || '',
-      subject_name: 'English',
-      teacher_name: 'Mrs. Chigumba',
-      period_name: 'Period 2',
-      class_name: 'Form 4A',
-      start_time: '08:40',
-      end_time: '09:20'
-    }
-  ]
+  const { data: periods, isLoading: periodsLoading } = usePeriods()
+  const { data: subjects } = useSubjects()
+  const createPeriodMutation = useCreatePeriod()
+  const createTimetableMutation = useCreateTimetable()
 
-  const mockClasses = [
-    { id: 'class1', name: 'Form 4A', grade_level: 11 },
-    { id: 'class2', name: 'Form 4B', grade_level: 11 },
-    { id: 'class3', name: 'Form 5A', grade_level: 12 }
-  ]
-
-  const mockSubjects = [
-    { id: 'math', name: 'Mathematics', code: 'MATH' },
-    { id: 'english', name: 'English', code: 'ENG' },
-    { id: 'science', name: 'Science', code: 'SCI' },
-    { id: 'history', name: 'History', code: 'HIST' }
-  ]
-
-  const mockTeachers = [
-    { id: 'teacher1', name: 'Mr. Mukamuri', subjects: ['math'] },
-    { id: 'teacher2', name: 'Mrs. Chigumba', subjects: ['english'] },
-    { id: 'teacher3', name: 'Dr. Moyo', subjects: ['science'] }
-  ]
-
-  // Create period mutation
-  const createPeriodMutation = useMutation({
-    mutationFn: (data: PeriodCreate) => academicApi.createPeriod(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['periods'] })
-      setIsCreatePeriodOpen(false)
-      toast.success('Period created successfully')
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to create period')
+  const {
+    register: registerPeriod,
+    handleSubmit: handlePeriodSubmit,
+    formState: { errors: periodErrors },
+    reset: resetPeriod,
+    setValue: setPeriodValue,
+    watch: watchPeriod
+  } = useForm<PeriodFormData>({
+    resolver: zodResolver(periodSchema),
+    defaultValues: {
+      is_break: false,
+      period_number: 1
     }
   })
 
-  // Create timetable entry mutation
-  const createTimetableMutation = useMutation({
-    mutationFn: (data: TimetableCreate) => academicApi.createTimetableEntry(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['timetable'] })
-      setIsCreateTimetableOpen(false)
-      toast.success('Timetable entry created successfully')
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to create timetable entry')
-    }
-  })
-
-  const getFilteredTimetableEntries = () => {
-    return mockTimetableEntries.filter(entry => 
-      entry.term_number === selectedTerm &&
-      (!selectedClass || entry.class_id === selectedClass)
-    )
-  }
-
-  const getTimetableGrid = () => {
-    const entries = getFilteredTimetableEntries()
-    const grid: { [key: string]: TimetableWithDetails | null } = {}
-    
-    DAYS_OF_WEEK.forEach(day => {
-      mockPeriods.filter(p => !p.is_break).forEach(period => {
-        const key = `${day.value}-${period.id}`
-        const entry = entries.find(e => e.day_of_week === day.value && e.period_id === period.id)
-        grid[key] = entry || null
-      })
-    })
-    
-    return grid
-  }
-
-  const PeriodForm = ({ onSubmit, isLoading }: { onSubmit: (data: PeriodCreate) => void; isLoading: boolean }) => {
-    const [formData, setFormData] = useState<PeriodCreate>({
-      period_number: mockPeriods.length + 1,
-      name: '',
-      start_time: '',
-      end_time: '',
-      is_break: false
-    })
-
-    const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault()
-      onSubmit(formData)
-    }
-
-    return (
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="period_number">Period Number *</Label>
-            <Input
-              id="period_number"
-              type="number"
-              value={formData.period_number}
-              onChange={(e) => setFormData(prev => ({ ...prev, period_number: Number(e.target.value) }))}
-              min={1}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="name">Period Name *</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="e.g., Period 1, Tea Break"
-              required
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="start_time">Start Time *</Label>
-            <Input
-              id="start_time"
-              type="time"
-              value={formData.start_time}
-              onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="end_time">End Time *</Label>
-            <Input
-              id="end_time"
-              type="time"
-              value={formData.end_time}
-              onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
-              required
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            id="is_break"
-            checked={formData.is_break}
-            onChange={(e) => setFormData(prev => ({ ...prev, is_break: e.target.checked }))}
-            className="rounded"
-          />
-          <Label htmlFor="is_break">This is a break period</Label>
-        </div>
-
-        {formData.is_break && (
-          <div className="space-y-2">
-            <Label htmlFor="break_type">Break Type</Label>
-            <Select 
-              value={formData.break_type || ''}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, break_type: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select break type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tea">Tea Break</SelectItem>
-                <SelectItem value="lunch">Lunch Break</SelectItem>
-                <SelectItem value="assembly">Assembly</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        <DialogFooter>
-          <Button type="submit" disabled={isLoading}>
-            {isLoading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />}
-            <Save className="h-4 w-4 mr-2" />
-            Create Period
-          </Button>
-        </DialogFooter>
-      </form>
-    )
-  }
-
-  const TimetableForm = ({ onSubmit, isLoading }: { onSubmit: (data: TimetableCreate) => void; isLoading: boolean }) => {
-    const [formData, setFormData] = useState<TimetableCreate>({
+  const {
+    register: registerTimetable,
+    handleSubmit: handleTimetableSubmit,
+    formState: { errors: timetableErrors },
+    reset: resetTimetable,
+    setValue: setTimetableValue,
+    watch: watchTimetable
+  } = useForm<TimetableFormData>({
+    resolver: zodResolver(timetableSchema),
+    defaultValues: {
       academic_year_id: academicYearId,
       term_number: selectedTerm,
-      class_id: '',
-      subject_id: '',
-      teacher_id: '',
-      period_id: '',
-      day_of_week: 1,
-      room_number: '',
       is_double_period: false,
       is_practical: false,
-      week_pattern: 'all',
+      week_pattern: "all",
       effective_from: new Date().toISOString().split('T')[0]
-    })
-
-    const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault()
-      onSubmit(formData)
     }
+  })
 
-    return (
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="class_id">Class *</Label>
-            <Select 
-              value={formData.class_id}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, class_id: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select class" />
-              </SelectTrigger>
-              <SelectContent>
-                {mockClasses.map(cls => (
-                  <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="subject_id">Subject *</Label>
-            <Select 
-              value={formData.subject_id}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, subject_id: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select subject" />
-              </SelectTrigger>
-              <SelectContent>
-                {mockSubjects.map(subject => (
-                  <SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+  const watchIsBreak = watchPeriod("is_break")
+  const watchIsPractical = watchTimetable("is_practical")
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="teacher_id">Teacher *</Label>
-            <Select 
-              value={formData.teacher_id}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, teacher_id: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select teacher" />
-              </SelectTrigger>
-              <SelectContent>
-                {mockTeachers.map(teacher => (
-                  <SelectItem key={teacher.id} value={teacher.id}>{teacher.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="room_number">Room</Label>
-            <Input
-              id="room_number"
-              value={formData.room_number}
-              onChange={(e) => setFormData(prev => ({ ...prev, room_number: e.target.value }))}
-              placeholder="e.g., Room 101, Lab A"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="day_of_week">Day *</Label>
-            <Select 
-              value={formData.day_of_week.toString()}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, day_of_week: Number(value) }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DAYS_OF_WEEK.map(day => (
-                  <SelectItem key={day.value} value={day.value.toString()}>{day.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="period_id">Period *</Label>
-            <Select 
-              value={formData.period_id}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, period_id: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select period" />
-              </SelectTrigger>
-              <SelectContent>
-                {mockPeriods.filter(p => !p.is_break).map(period => (
-                  <SelectItem key={period.id} value={period.id}>
-                    {period.name} ({formatTime(period.start_time)} - {formatTime(period.end_time)})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="week_pattern">Week Pattern</Label>
-            <Select 
-              value={formData.week_pattern}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, week_pattern: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {WEEK_PATTERNS.map(pattern => (
-                  <SelectItem key={pattern.value} value={pattern.value}>{pattern.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="is_double_period"
-              checked={formData.is_double_period}
-              onChange={(e) => setFormData(prev => ({ ...prev, is_double_period: e.target.checked }))}
-              className="rounded"
-            />
-            <Label htmlFor="is_double_period">Double Period</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="is_practical"
-              checked={formData.is_practical}
-              onChange={(e) => setFormData(prev => ({ ...prev, is_practical: e.target.checked }))}
-              className="rounded"
-            />
-            <Label htmlFor="is_practical">Practical Session</Label>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button type="submit" disabled={isLoading}>
-            {isLoading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />}
-            <Save className="h-4 w-4 mr-2" />
-            Add to Timetable
-          </Button>
-        </DialogFooter>
-      </form>
-    )
+  const handleCreatePeriod = async (data: PeriodFormData) => {
+    try {
+      await createPeriodMutation.mutateAsync(data)
+      setIsPeriodDialogOpen(false)
+      resetPeriod()
+    } catch (error) {
+      // Error handled by mutation
+    }
   }
 
-  const renderTimetableGrid = () => {
-    const grid = getTimetableGrid()
-    const teachingPeriods = mockPeriods.filter(p => !p.is_break)
+  const handleCreateTimetableEntry = async (data: TimetableFormData) => {
+    try {
+      await createTimetableMutation.mutateAsync(data)
+      setIsTimetableDialogOpen(false)
+      resetTimetable()
+    } catch (error) {
+      // Error handled by mutation
+    }
+  }
 
-    return (
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse border border-gray-300">
-          <thead>
-            <tr>
-              <th className="border border-gray-300 p-2 bg-gray-50 w-24">Time</th>
-              {DAYS_OF_WEEK.map(day => (
-                <th key={day.value} className="border border-gray-300 p-2 bg-gray-50 min-w-32">
-                  {day.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {teachingPeriods.map(period => (
-              <tr key={period.id}>
-                <td className="border border-gray-300 p-2 bg-gray-50 text-sm">
-                  <div className="font-medium">{period.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatTime(period.start_time)} - {formatTime(period.end_time)}
-                  </div>
-                </td>
-                {DAYS_OF_WEEK.map(day => {
-                  const entry = grid[`${day.value}-${period.id}`]
-                  return (
-                    <td key={`${day.value}-${period.id}`} className="border border-gray-300 p-1 h-20 relative">
-                      {entry ? (
-                        <div className="bg-blue-50 border border-blue-200 rounded p-2 h-full">
-                          <div className="text-xs font-medium text-blue-900 truncate">
-                            {entry.subject_name}
-                          </div>
-                          <div className="text-xs text-blue-700 truncate">
-                            {entry.teacher_name}
-                          </div>
-                          {entry.room_number && (
-                            <div className="text-xs text-blue-600 truncate">
-                              {entry.room_number}
-                            </div>
-                          )}
-                          {entry.is_practical && (
-                            <Badge variant="outline" className="text-xs mt-1">
-                              Practical
-                            </Badge>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="h-full flex items-center justify-center text-gray-400">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setIsCreateTimetableOpen(true)}
-                            className="text-xs"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      )}
-                    </td>
-                  )
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+  const getBreakIcon = (breakType?: string) => {
+    switch (breakType) {
+      case 'tea': return <Coffee className="h-4 w-4" />
+      case 'lunch': return <Utensils className="h-4 w-4" />
+      case 'assembly': return <Users className="h-4 w-4" />
+      default: return <Clock className="h-4 w-4" />
+    }
+  }
+
+  const renderPeriodsTable = () => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Period</TableHead>
+          <TableHead>Name</TableHead>
+          <TableHead>Time</TableHead>
+          <TableHead>Duration</TableHead>
+          <TableHead>Type</TableHead>
+          <TableHead>Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {periods?.items?.map((period: Period) => (
+          <TableRow key={period.id}>
+            <TableCell className="font-medium">
+              {period.period_number}
+            </TableCell>
+            <TableCell className="flex items-center space-x-2">
+              {getBreakIcon(period.break_type)}
+              <span>{period.name}</span>
+            </TableCell>
+            <TableCell>
+              {period.start_time} - {period.end_time}
+            </TableCell>
+            <TableCell>
+              {(() => {
+                const start = new Date(`2024-01-01T${period.start_time}:00`)
+                const end = new Date(`2024-01-01T${period.end_time}:00`)
+                const duration = (end.getTime() - start.getTime()) / (1000 * 60)
+                return `${duration} min`
+              })()}
+            </TableCell>
+            <TableCell>
+              {period.is_break ? (
+                <Badge variant="secondary" className="capitalize">
+                  {period.break_type || 'Break'}
+                </Badge>
+              ) : (
+                <Badge variant="outline">
+                  Class
+                </Badge>
+              )}
+            </TableCell>
+            <TableCell>
+              <div className="flex items-center space-x-2">
+                <Button variant="ghost" size="sm">
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="sm">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  )
+
+  const renderWeeklyTimetable = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-7 gap-4">
+        <div className="font-semibold p-2">Time</div>
+        {DAYS_OF_WEEK.map((day) => (
+          <div key={day.value} className="font-semibold p-2 text-center">
+            {day.short}
+          </div>
+        ))}
       </div>
-    )
-  }
+      
+      {periods?.items?.filter((p: Period) => !p.is_break).map((period: Period) => (
+        <div key={period.id} className="grid grid-cols-7 gap-4 border rounded-lg p-2">
+          <div className="flex flex-col justify-center">
+            <div className="font-medium text-sm">{period.name}</div>
+            <div className="text-xs text-muted-foreground">
+              {period.start_time} - {period.end_time}
+            </div>
+          </div>
+          
+          {DAYS_OF_WEEK.map((day) => (
+            <div key={day.value} className="min-h-[60px] border rounded p-2 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors">
+              <div className="text-xs text-center text-muted-foreground">
+                No class scheduled
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -664,207 +277,453 @@ export function TimetableManagement({ academicYearId, className }: TimetableMana
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Timetable Management</h1>
           <p className="text-muted-foreground">
-            Manage class schedules and periods for {user?.school_name}
+            Manage school timetables, periods, and class schedules
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Dialog open={isCreatePeriodOpen} onOpenChange={setIsCreatePeriodOpen}>
+          <Dialog open={isPeriodDialogOpen} onOpenChange={setIsPeriodDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
-                <Clock className="h-4 w-4 mr-2" />
+                <Clock className="mr-2 h-4 w-4" />
                 Add Period
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create Period</DialogTitle>
+                <DialogTitle>Create New Period</DialogTitle>
                 <DialogDescription>
-                  Add a new period to the school timetable
+                  Add a new time period to the school schedule
                 </DialogDescription>
               </DialogHeader>
-              <PeriodForm
-                onSubmit={(data) => createPeriodMutation.mutate(data)}
-                isLoading={createPeriodMutation.isPending}
-              />
+              
+              <form onSubmit={handlePeriodSubmit(handleCreatePeriod)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="period_number">Period Number*</Label>
+                    <Input
+                      id="period_number"
+                      type="number"
+                      min="1"
+                      {...registerPeriod("period_number", { valueAsNumber: true })}
+                    />
+                    {periodErrors.period_number && (
+                      <p className="text-sm text-red-600 mt-1">{periodErrors.period_number.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="name">Period Name*</Label>
+                    <Input
+                      id="name"
+                      placeholder="e.g., Period 1, Tea Break"
+                      {...registerPeriod("name")}
+                    />
+                    {periodErrors.name && (
+                      <p className="text-sm text-red-600 mt-1">{periodErrors.name.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="start_time">Start Time*</Label>
+                    <Input
+                      id="start_time"
+                      type="time"
+                      {...registerPeriod("start_time")}
+                    />
+                    {periodErrors.start_time && (
+                      <p className="text-sm text-red-600 mt-1">{periodErrors.start_time.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="end_time">End Time*</Label>
+                    <Input
+                      id="end_time"
+                      type="time"
+                      {...registerPeriod("end_time")}
+                    />
+                    {periodErrors.end_time && (
+                      <p className="text-sm text-red-600 mt-1">{periodErrors.end_time.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="is_break"
+                    checked={watchIsBreak}
+                    onCheckedChange={(checked) => setPeriodValue("is_break", checked as boolean)}
+                  />
+                  <Label htmlFor="is_break">This is a break period</Label>
+                </div>
+
+                {watchIsBreak && (
+                  <div>
+                    <Label htmlFor="break_type">Break Type</Label>
+                    <Select onValueChange={(value) => setPeriodValue("break_type", value as any)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select break type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="tea">
+                          <div className="flex items-center">
+                            <Coffee className="mr-2 h-4 w-4" />
+                            Tea Break
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="lunch">
+                          <div className="flex items-center">
+                            <Utensils className="mr-2 h-4 w-4" />
+                            Lunch Break
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="assembly">
+                          <div className="flex items-center">
+                            <Users className="mr-2 h-4 w-4" />
+                            Assembly
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsPeriodDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={createPeriodMutation.isPending}>
+                    {createPeriodMutation.isPending ? (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Create Period
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
             </DialogContent>
           </Dialog>
           
-          <Dialog open={isCreateTimetableOpen} onOpenChange={setIsCreateTimetableOpen}>
+          <Dialog open={isTimetableDialogOpen} onOpenChange={setIsTimetableDialogOpen}>
             <DialogTrigger asChild>
               <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Class
+                <Plus className="mr-2 h-4 w-4" />
+                Add Timetable Entry
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Add Timetable Entry</DialogTitle>
+                <DialogTitle>Create Timetable Entry</DialogTitle>
                 <DialogDescription>
                   Schedule a class for a specific period and day
                 </DialogDescription>
               </DialogHeader>
-              <TimetableForm
-                onSubmit={(data) => createTimetableMutation.mutate(data)}
-                isLoading={createTimetableMutation.isPending}
-              />
+              
+              <form onSubmit={handleTimetableSubmit(handleCreateTimetableEntry)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="term_number">Term</Label>
+                    <Select 
+                      value={selectedTerm.toString()}
+                      onValueChange={(value) => {
+                        const termNumber = parseInt(value)
+                        setSelectedTerm(termNumber)
+                        setTimetableValue("term_number", termNumber)
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {zimbabweTerms.map((term) => (
+                          <SelectItem key={term.value} value={term.value.toString()}>
+                            {formatTerm(term.value)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="day_of_week">Day of Week*</Label>
+                    <Select onValueChange={(value) => setTimetableValue("day_of_week", parseInt(value))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select day" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DAYS_OF_WEEK.map((day) => (
+                          <SelectItem key={day.value} value={day.value.toString()}>
+                            {day.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {timetableErrors.day_of_week && (
+                      <p className="text-sm text-red-600 mt-1">{timetableErrors.day_of_week.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="period_id">Period*</Label>
+                    <Select onValueChange={(value) => setTimetableValue("period_id", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select period" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {periods?.items?.filter((p: Period) => !p.is_break).map((period: Period) => (
+                          <SelectItem key={period.id} value={period.id}>
+                            {period.name} ({period.start_time} - {period.end_time})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {timetableErrors.period_id && (
+                      <p className="text-sm text-red-600 mt-1">{timetableErrors.period_id.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="subject_id">Subject*</Label>
+                    <Select onValueChange={(value) => setTimetableValue("subject_id", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select subject" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {subjects?.items?.map((subject: any) => (
+                          <SelectItem key={subject.id} value={subject.id}>
+                            {subject.name} ({subject.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {timetableErrors.subject_id && (
+                      <p className="text-sm text-red-600 mt-1">{timetableErrors.subject_id.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="class_id">Class*</Label>
+                    <Input
+                      placeholder="Class ID (from SIS module)"
+                      {...registerTimetable("class_id")}
+                    />
+                    {timetableErrors.class_id && (
+                      <p className="text-sm text-red-600 mt-1">{timetableErrors.class_id.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="teacher_id">Teacher*</Label>
+                    <Input
+                      placeholder="Teacher ID (from user management)"
+                      {...registerTimetable("teacher_id")}
+                    />
+                    {timetableErrors.teacher_id && (
+                      <p className="text-sm text-red-600 mt-1">{timetableErrors.teacher_id.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="room_number">Room Number</Label>
+                    <Input
+                      placeholder="e.g., Room 101, Lab A"
+                      {...registerTimetable("room_number")}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="week_pattern">Week Pattern</Label>
+                    <Select 
+                      defaultValue="all"
+                      onValueChange={(value) => setTimetableValue("week_pattern", value as any)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {WEEK_PATTERNS.map((pattern) => (
+                          <SelectItem key={pattern.value} value={pattern.value}>
+                            {pattern.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="is_double_period"
+                      onCheckedChange={(checked) => setTimetableValue("is_double_period", checked as boolean)}
+                    />
+                    <Label htmlFor="is_double_period">Double Period</Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="is_practical"
+                      checked={watchIsPractical}
+                      onCheckedChange={(checked) => setTimetableValue("is_practical", checked as boolean)}
+                    />
+                    <Label htmlFor="is_practical">Practical Class</Label>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsTimetableDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={createTimetableMutation.isPending}>
+                    {createTimetableMutation.isPending ? (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Create Entry
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Term and View Controls */}
       <Card>
-        <CardContent className="p-4">
+        <CardHeader>
+          <CardTitle>View Controls</CardTitle>
+        </CardHeader>
+        <CardContent>
           <div className="flex items-center space-x-4">
-            <div className="space-y-1">
-              <Label className="text-sm">Term</Label>
-              <Select value={selectedTerm.toString()} onValueChange={(value) => setSelectedTerm(Number(value) as TermNumber)}>
-                <SelectTrigger className="w-32">
+            <div>
+              <Label>Academic Term</Label>
+              <Select 
+                value={selectedTerm.toString()}
+                onValueChange={(value) => setSelectedTerm(parseInt(value))}
+              >
+                <SelectTrigger className="w-48">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">Term 1</SelectItem>
-                  <SelectItem value="2">Term 2</SelectItem>
-                  <SelectItem value="3">Term 3</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-1">
-              <Label className="text-sm">Class</Label>
-              <Select value={selectedClass} onValueChange={setSelectedClass}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="All classes" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All classes</SelectItem>
-                  {mockClasses.map(cls => (
-                    <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                  {zimbabweTerms.map((term) => (
+                    <SelectItem key={term.value} value={term.value.toString()}>
+                      {formatTerm(term.value)}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            
-            <div className="space-y-1">
-              <Label className="text-sm">View</Label>
-              <Select value={viewMode} onValueChange={(value) => setViewMode(value as 'week' | 'teacher' | 'room')}>
-                <SelectTrigger className="w-32">
+            <div>
+              <Label>View Type</Label>
+              <Select value={selectedView} onValueChange={(value) => setSelectedView(value as any)}>
+                <SelectTrigger className="w-48">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="week">Weekly</SelectItem>
-                  <SelectItem value="teacher">By Teacher</SelectItem>
-                  <SelectItem value="room">By Room</SelectItem>
+                  <SelectItem value="week">Weekly Timetable</SelectItem>
+                  <SelectItem value="teacher">Teacher View</SelectItem>
+                  <SelectItem value="room">Room View</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            
-            <Button variant="outline" className="mt-5">
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
           </div>
         </CardContent>
       </Card>
 
       {/* Main Content */}
-      <Tabs defaultValue="timetable" className="space-y-4">
+      <Tabs defaultValue="timetable" className="space-y-6">
         <TabsList>
           <TabsTrigger value="timetable">Timetable</TabsTrigger>
           <TabsTrigger value="periods">Periods</TabsTrigger>
-          <TabsTrigger value="conflicts">Conflicts</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="timetable">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Calendar className="h-5 w-5 mr-2" />
-                  Weekly Timetable - Term {selectedTerm}
-                </div>
-                <div className="flex items-center space-x-2">
-                  {selectedClass && (
-                    <Badge variant="outline">
-                      {mockClasses.find(c => c.id === selectedClass)?.name}
-                    </Badge>
-                  )}
-                  <Button variant="outline" size="sm">
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh
-                  </Button>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {renderTimetableGrid()}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="periods">
+        
+        <TabsContent value="timetable" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
-                <Clock className="h-5 w-5 mr-2" />
+                <Calendar className="mr-2 h-5 w-5" />
+                {formatTerm(selectedTerm)} Timetable
+              </CardTitle>
+              <CardDescription>
+                Weekly class schedule for the selected term
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {selectedView === 'week' && renderWeeklyTimetable()}
+              {selectedView === 'teacher' && (
+                <div className="text-center py-8">
+                  <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Teacher View</h3>
+                  <p className="text-muted-foreground">
+                    Teacher-specific timetable view coming soon
+                  </p>
+                </div>
+              )}
+              {selectedView === 'room' && (
+                <div className="text-center py-8">
+                  <MapPin className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Room View</h3>
+                  <p className="text-muted-foreground">
+                    Room utilization view coming soon
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="periods" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Clock className="mr-2 h-5 w-5" />
                 School Periods
               </CardTitle>
               <CardDescription>
-                Manage daily periods and break times
+                Manage time periods for the school day
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {mockPeriods.map((period) => (
-                  <div key={period.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className="text-lg font-medium">
-                        {period.period_number}
-                      </div>
-                      <div>
-                        <div className="font-medium">{period.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {formatTime(period.start_time)} - {formatTime(period.end_time)}
-                        </div>
-                      </div>
+              {periodsLoading ? (
+                <div className="space-y-4">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="flex items-center space-x-4">
+                      <Skeleton className="h-4 w-16" />
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-4 w-20" />
                     </div>
-                    <div className="flex items-center space-x-2">
-                      {period.is_break && (
-                        <Badge variant="secondary" className="capitalize">
-                          {period.break_type || 'Break'}
-                        </Badge>
-                      )}
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="conflicts">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <AlertTriangle className="h-5 w-5 mr-2" />
-                Schedule Conflicts
-              </CardTitle>
-              <CardDescription>
-                Identify and resolve timetable conflicts
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>No conflicts detected</p>
-                <p className="text-sm">All timetable entries are properly scheduled</p>
-              </div>
+                  ))}
+                </div>
+              ) : periods?.items?.length > 0 ? (
+                renderPeriodsTable()
+              ) : (
+                <div className="text-center py-8">
+                  <Clock className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No periods configured</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Create your first school period to get started with timetabling
+                  </p>
+                  <Button onClick={() => setIsPeriodDialogOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Period
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -872,5 +731,3 @@ export function TimetableManagement({ academicYearId, className }: TimetableMana
     </div>
   )
 }
-
-export default TimetableManagement
