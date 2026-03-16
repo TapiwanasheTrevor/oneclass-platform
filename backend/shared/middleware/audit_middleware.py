@@ -19,7 +19,7 @@ from ..models.audit_log import (
     AuditLog, ActionCategory, ActionType, RiskLevel, ComplianceCategory,
     ActionContext, ActionDetails, SecurityMetadata
 )
-from ..models.unified_user import UnifiedUser, SchoolRole
+from ..models.platform_user import PlatformUser, SchoolRole
 from ..database import get_async_session
 import logging
 
@@ -521,7 +521,7 @@ async def log_security_event(
     
     try:
         # Get user info
-        user_query = select(UnifiedUser).where(UnifiedUser.id == user_id)
+        user_query = select(PlatformUser).where(PlatformUser.id == user_id)
         user_result = await session.execute(user_query)
         user = user_result.scalar_one_or_none()
         

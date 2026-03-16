@@ -18,7 +18,7 @@ from ..super_admin_service import (
 )
 from ...shared.auth import get_current_user, require_super_admin
 from ...shared.database import get_async_session
-from ...shared.models.unified_user import UnifiedUser, GlobalRole
+from ...shared.models.platform_user import PlatformUser, GlobalRole
 
 import logging
 
@@ -71,7 +71,7 @@ router = APIRouter(prefix="/api/v1/super-admin", tags=["Super Admin"])
 
 @router.get("/dashboard/metrics", response_model=PlatformMetrics)
 async def get_platform_metrics(
-    current_user: UnifiedUser = Depends(require_super_admin),
+    current_user: PlatformUser = Depends(require_super_admin),
     session: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -115,7 +115,7 @@ async def get_school_registrations(
     sort_order: str = Query("desc", regex="^(asc|desc)$", description="Sort order"),
     
     # Dependencies
-    current_user: UnifiedUser = Depends(require_super_admin),
+    current_user: PlatformUser = Depends(require_super_admin),
     session: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -171,7 +171,7 @@ async def get_school_registrations(
 @router.get("/schools/{school_id}", response_model=Dict[str, Any])
 async def get_school_details(
     school_id: UUID,
-    current_user: UnifiedUser = Depends(require_super_admin),
+    current_user: PlatformUser = Depends(require_super_admin),
     session: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -211,7 +211,7 @@ async def get_school_details(
 async def approve_school_registration(
     school_id: UUID,
     approval_data: ApprovalRequest,
-    current_user: UnifiedUser = Depends(require_super_admin),
+    current_user: PlatformUser = Depends(require_super_admin),
     session: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -250,7 +250,7 @@ async def approve_school_registration(
 async def reject_school_registration(
     school_id: UUID,
     rejection_data: RejectionRequest,
-    current_user: UnifiedUser = Depends(require_super_admin),
+    current_user: PlatformUser = Depends(require_super_admin),
     session: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -288,7 +288,7 @@ async def reject_school_registration(
 @router.get("/migration-services/requests", response_model=List[Dict[str, Any]])
 async def get_migration_requests(
     status: Optional[MigrationServiceStatus] = Query(None, description="Filter by migration status"),
-    current_user: UnifiedUser = Depends(require_super_admin),
+    current_user: PlatformUser = Depends(require_super_admin),
     session: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -340,7 +340,7 @@ async def get_migration_requests(
 async def update_migration_service_status(
     school_id: UUID,
     status_update: MigrationStatusUpdate,
-    current_user: UnifiedUser = Depends(require_super_admin),
+    current_user: PlatformUser = Depends(require_super_admin),
     session: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -379,7 +379,7 @@ async def update_migration_service_status(
 async def assign_migration_manager(
     school_id: UUID,
     manager_assignment: AssignManagerRequest,
-    current_user: UnifiedUser = Depends(require_super_admin),
+    current_user: PlatformUser = Depends(require_super_admin),
     session: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -417,7 +417,7 @@ async def assign_migration_manager(
 @router.get("/analytics/schools", response_model=Dict[str, Any])
 async def get_school_analytics(
     days: int = Query(30, ge=1, le=365, description="Number of days to analyze"),
-    current_user: UnifiedUser = Depends(require_super_admin),
+    current_user: PlatformUser = Depends(require_super_admin),
     session: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -449,7 +449,7 @@ async def get_school_analytics(
 
 @router.get("/migration-services/analytics", response_model=Dict[str, Any])
 async def get_migration_services_analytics(
-    current_user: UnifiedUser = Depends(require_super_admin),
+    current_user: PlatformUser = Depends(require_super_admin),
     session: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -517,7 +517,7 @@ async def get_migration_services_analytics(
 async def export_school_data(
     format: str = Query("csv", regex="^(csv|xlsx)$", description="Export format"),
     status: Optional[SchoolStatus] = Query(None, description="Filter by school status"),
-    current_user: UnifiedUser = Depends(require_super_admin),
+    current_user: PlatformUser = Depends(require_super_admin),
     session: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -548,7 +548,7 @@ async def export_school_data(
 async def execute_admin_action(
     school_id: UUID,
     action_request: AdminActionRequest,
-    current_user: UnifiedUser = Depends(require_super_admin),
+    current_user: PlatformUser = Depends(require_super_admin),
     session: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -596,7 +596,7 @@ async def execute_admin_action(
 
 @router.get("/system/health")
 async def system_health_check(
-    current_user: UnifiedUser = Depends(require_super_admin)
+    current_user: PlatformUser = Depends(require_super_admin)
 ):
     """
     System health check for super admins
@@ -621,7 +621,7 @@ async def system_health_check(
 
 @router.get("/system/stats")
 async def get_system_stats(
-    current_user: UnifiedUser = Depends(require_super_admin),
+    current_user: PlatformUser = Depends(require_super_admin),
     session: AsyncSession = Depends(get_async_session)
 ):
     """

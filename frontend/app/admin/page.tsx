@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * School Admin Dashboard
  * Main dashboard for school administrators with comprehensive overview and management tools

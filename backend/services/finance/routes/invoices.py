@@ -235,9 +235,9 @@ async def bulk_send_invoices(
 @require_feature("finance_module")
 async def bulk_send_reminders(
     invoice_ids: List[UUID],
-    reminder_message: Optional[str] = None,
     background_tasks: BackgroundTasks,
-    current_user: EnhancedUser = Depends(get_current_active_user)
+    reminder_message: Optional[str] = None,
+    current_user: EnhancedUser = Depends(get_current_active_user),
 ):
     """
     Send payment reminders for multiple invoices.

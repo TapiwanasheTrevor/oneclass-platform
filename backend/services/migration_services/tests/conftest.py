@@ -22,7 +22,8 @@ from shared.models.migration_services import (
 from services.migration_services.service import MigrationServicesService
 from services.migration_services.routes import router
 from shared.models.platform import 
-from shared.models.platform_user import PlatformUserDB as User, School
+from shared.models.platform_user import PlatformUser as User
+from shared.models.platform import School
 
 
 @pytest.fixture(scope="session")

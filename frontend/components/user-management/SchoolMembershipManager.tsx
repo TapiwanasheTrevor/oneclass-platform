@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 
-import { useAuth, usePermissions, PlatformUser, SchoolRole, UserStatus } from '@/hooks/useAuth';
+import { usePermissions, PlatformUser, SchoolRole, UserStatus } from '@/hooks/useAuth';
 
 interface SchoolMembership {
   school_id: string;
@@ -59,7 +59,6 @@ export const SchoolMembershipManager: React.FC<SchoolMembershipManagerProps> = (
   user,
   onMembershipUpdate
 }) => {
-  const { token } = useAuth();
   const { canManageUsers, isPlatformAdmin } = usePermissions();
   
   const [memberships, setMemberships] = useState<SchoolMembership[]>(user.school_memberships);
@@ -82,11 +81,7 @@ export const SchoolMembershipManager: React.FC<SchoolMembershipManagerProps> = (
 
   const fetchAvailableSchools = async () => {
     try {
-      const response = await fetch('/api/v1/schools', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await fetch('/api/v1/schools');
       
       if (response.ok) {
         const schools = await response.json();
@@ -146,7 +141,6 @@ export const SchoolMembershipManager: React.FC<SchoolMembershipManagerProps> = (
       const response = await fetch(`/api/v1/users/${user.id}/school-memberships`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(membershipData),
@@ -182,7 +176,6 @@ export const SchoolMembershipManager: React.FC<SchoolMembershipManagerProps> = (
       const response = await fetch(`/api/v1/users/${user.id}/school-memberships/${membership.school_id}`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(membership),
@@ -215,9 +208,6 @@ export const SchoolMembershipManager: React.FC<SchoolMembershipManagerProps> = (
     try {
       const response = await fetch(`/api/v1/users/${user.id}/school-memberships/${schoolId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
       });
 
       if (!response.ok) {

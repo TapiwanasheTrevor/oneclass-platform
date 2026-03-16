@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Student Dashboard
  * Main dashboard for students with academic overview and learning tools

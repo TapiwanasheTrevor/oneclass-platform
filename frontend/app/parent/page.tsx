@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Parent Dashboard
  * Main dashboard for parents to monitor their children's academic progress

@@ -14,7 +14,7 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 
-import { useAuth, usePermissions } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/useAuth';
 
 interface PerformanceMetric {
   name: string;
@@ -93,7 +93,6 @@ interface HealthStatus {
 }
 
 export const PerformanceMonitoringDashboard: React.FC = () => {
-  const { token } = useAuth();
   const { isPlatformAdmin } = usePermissions();
   
   const [healthStatus, setHealthStatus] = useState<HealthStatus | null>(null);
@@ -129,11 +128,7 @@ export const PerformanceMonitoringDashboard: React.FC = () => {
 
   const fetchHealthStatus = async () => {
     try {
-      const response = await fetch('/api/v1/health', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await fetch('/api/v1/health');
       
       if (response.ok) {
         const health = await response.json();
@@ -147,11 +142,7 @@ export const PerformanceMonitoringDashboard: React.FC = () => {
   const fetchPerformanceReport = async (hours: number) => {
     try {
       setRefreshing(true);
-      const response = await fetch(`/api/v1/monitoring/performance-report?hours=${hours}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(`/api/v1/monitoring/performance-report?hours=${hours}`);
       
       if (response.ok) {
         const report = await response.json();
@@ -168,11 +159,7 @@ export const PerformanceMonitoringDashboard: React.FC = () => {
 
   const fetchAlerts = async () => {
     try {
-      const response = await fetch('/api/v1/monitoring/alerts', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await fetch('/api/v1/monitoring/alerts');
       
       if (response.ok) {
         const alertsData = await response.json();
@@ -193,9 +180,6 @@ export const PerformanceMonitoringDashboard: React.FC = () => {
     try {
       const response = await fetch(`/api/v1/monitoring/alerts/${alertId}/resolve`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
       });
       
       if (response.ok) {

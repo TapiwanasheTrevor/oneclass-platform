@@ -4,17 +4,16 @@ Database models for student-related entities (students, attendance, enrollment)
 """
 from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer, JSON, ForeignKey, Date, Time
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 import uuid
 
-Base = declarative_base()
+from shared.database import Base
 
 class Student(Base):
     """Student model"""
     __tablename__ = "students"
-    __table_args__ = {"schema": "sis"}
+    __table_args__ = {"schema": "sis", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, index=True)
@@ -81,7 +80,7 @@ class Student(Base):
 class Enrollment(Base):
     """Student enrollment history"""
     __tablename__ = "enrollments"
-    __table_args__ = {"schema": "sis"}
+    __table_args__ = {"schema": "sis", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, index=True)
@@ -128,7 +127,7 @@ class Enrollment(Base):
 class AttendanceRecord(Base):
     """Daily attendance records"""
     __tablename__ = "attendance_records"
-    __table_args__ = {"schema": "sis"}
+    __table_args__ = {"schema": "sis", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, index=True)
@@ -174,7 +173,7 @@ class AttendanceRecord(Base):
 class DisciplinaryRecord(Base):
     """Student disciplinary records"""
     __tablename__ = "disciplinary_records"
-    __table_args__ = {"schema": "sis"}
+    __table_args__ = {"schema": "sis", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, index=True)
@@ -233,7 +232,7 @@ class DisciplinaryRecord(Base):
 class MedicalRecord(Base):
     """Student medical records"""
     __tablename__ = "medical_records"
-    __table_args__ = {"schema": "sis"}
+    __table_args__ = {"schema": "sis", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, index=True)
@@ -298,7 +297,7 @@ class MedicalRecord(Base):
 class StudentNote(Base):
     """General notes about students"""
     __tablename__ = "student_notes"
-    __table_args__ = {"schema": "sis"}
+    __table_args__ = {"schema": "sis", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, index=True)

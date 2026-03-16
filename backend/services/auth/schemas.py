@@ -9,7 +9,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
 
-from shared.models.platform_user import PlatformRole, SchoolRole, UserStatus
+from shared.models.platform_user import GlobalRole, PlatformRole, SchoolRole, UserStatus
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -30,7 +30,7 @@ class UserRegistrationRequest(BaseModel):
     password: str = Field(..., min_length=8, max_length=128)
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
-    platform_role: PlatformRole = PlatformRole.STUDENT
+    platform_role: GlobalRole = GlobalRole.SYSTEM_USER
     phone: Optional[str] = Field(None, max_length=20)
     
     @validator('email')
@@ -71,7 +71,7 @@ class OnboardingCompleteRequest(BaseModel):
     invitation_token: Optional[str] = None
     
     # Role and school info
-    primary_role: PlatformRole
+    primary_role: GlobalRole
     school_memberships: List[SchoolMembershipData]
     
     # Role-specific data

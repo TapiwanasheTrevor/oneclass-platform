@@ -186,3 +186,12 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
             yield session
         finally:
             await _reset_rls_context(session)
+
+
+# Convenience alias used by finance and other services for raw asyncpg connections
+async def get_database_connection():
+    """Get a raw asyncpg connection via the auth module's DatabaseManager.
+    Usage: async with get_database_connection() as conn: ...
+    """
+    from shared.auth import db_manager
+    return db_manager.get_connection()

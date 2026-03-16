@@ -17,7 +17,8 @@ from sqlalchemy.orm import Session
 from shared.middleware.tenant_middleware import TenantMiddleware, get_tenant_context
 from shared.auth import get_current_active_user, require_permission
 from shared.models.platform import 
-from shared.models.platform_user import PlatformUserDB as User, School
+from shared.models.platform_user import PlatformUser as User
+from shared.models.platform import School
 from services.migration_services.routes import router
 from services.migration_services.service import MigrationServicesService
 from shared.models.migration_services import (

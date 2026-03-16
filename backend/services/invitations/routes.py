@@ -55,8 +55,8 @@ async def create_invitation(
             )
 
         # Check if user already exists
-        existing_user_query = select(PlatformUserDB).where(
-            PlatformUserDB.email == invitation_data.email.lower()
+        existing_user_query = select(PlatformUser).where(
+            PlatformUser.email == invitation_data.email.lower()
         )
         existing_result = await db.execute(existing_user_query)
         existing_user = existing_result.scalar_one_or_none()
@@ -65,10 +65,10 @@ async def create_invitation(
 
         # Check if user already has membership to this school
         if existing_user:
-            existing_membership_query = select(SchoolMembershipDB).where(
+            existing_membership_query = select(SchoolMembership).where(
                 and_(
-                    SchoolMembershipDB.user_id == existing_user.id,
-                    SchoolMembershipDB.school_id == invitation_data.school_id,
+                    SchoolMembership.user_id == existing_user.id,
+                    SchoolMembership.school_id == invitation_data.school_id,
                 )
             )
             existing_membership_result = await db.execute(existing_membership_query)
@@ -102,7 +102,7 @@ async def create_invitation(
         invitation_token = create_invitation_token(token_data, expires_days=7)
 
         # Create invitation record
-        invitation = UserInvitationDB(
+        invitation = UserInvitation(
             id=UUID(token_data["invitation_id"]),
             email=invitation_data.email.lower(),
             school_id=invitation_data.school_id,

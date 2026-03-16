@@ -9,7 +9,7 @@ import logging
 from typing import Callable, Dict, Any, Optional
 from datetime import datetime
 from fastapi import Request, Response, HTTPException
-from fastapi.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import Message
 import json
 

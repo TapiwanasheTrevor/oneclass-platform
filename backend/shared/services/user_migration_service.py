@@ -26,6 +26,7 @@ from shared.models.platform_user import (
     SchoolMembership,
     UserProfile,
     ClerkIntegration,
+    GlobalRole,
     PlatformRole,
     SchoolRole,
     UserStatus,
@@ -684,7 +685,7 @@ class UserMigrationService:
                 completed_at=end_time,
             )
 
-    async def _convert_legacy_user_to_platform(self, legacy_user) -> PlatformUserDB:
+    async def _convert_legacy_user_to_platform(self, legacy_user) -> PlatformUser:
         """Convert legacy user record to new PlatformUser format"""
         # Create profile from legacy metadata
         profile_data = {}
@@ -715,7 +716,7 @@ class UserMigrationService:
         platform_role = self._map_legacy_role_to_platform(legacy_user.role)
 
         # Create new platform user
-        new_user = PlatformUserDB(
+        new_user = PlatformUser(
             id=legacy_user.id,  # Keep same ID for referential integrity
             email=legacy_user.email.lower().strip(),
             first_name=legacy_user.first_name,
@@ -737,24 +738,28 @@ class UserMigrationService:
 
         return new_user
 
-    def _map_legacy_role_to_platform(self, legacy_role: str) -> PlatformRole:
-        """Map legacy role to new platform role"""
+    def _map_legacy_role_to_platform(self, legacy_role: str) -> str:
+        """Map legacy role to new global platform role.
+        School-specific roles (teacher, student, etc.) become SYSTEM_USER
+        at the platform level — the school role goes into SchoolMembership.
+        """
         role_mapping = {
-            "platform_admin": PlatformRole.SUPER_ADMIN,
-            "admin": PlatformRole.SCHOOL_ADMIN,
-            "school_admin": PlatformRole.SCHOOL_ADMIN,
-            "teacher": PlatformRole.TEACHER,
-            "student": PlatformRole.STUDENT,
-            "parent": PlatformRole.PARENT,
-            "staff": PlatformRole.STAFF,
-            "registrar": PlatformRole.REGISTRAR,
+            "platform_admin": GlobalRole.PLATFORM_ADMIN.value,
+            "super_admin": GlobalRole.SUPER_ADMIN.value,
+            "admin": GlobalRole.SYSTEM_USER.value,
+            "school_admin": GlobalRole.SYSTEM_USER.value,
+            "teacher": GlobalRole.SYSTEM_USER.value,
+            "student": GlobalRole.SYSTEM_USER.value,
+            "parent": GlobalRole.SYSTEM_USER.value,
+            "staff": GlobalRole.SYSTEM_USER.value,
+            "registrar": GlobalRole.SYSTEM_USER.value,
         }
 
-        return role_mapping.get(legacy_role, PlatformRole.STUDENT)
+        return role_mapping.get(legacy_role, GlobalRole.SYSTEM_USER.value)
 
     async def _create_school_membership_from_legacy(
         self, user_id: UUID, legacy_user
-    ) -> Optional[SchoolMembershipDB]:
+    ) -> Optional[SchoolMembership]:
         """Create school membership from legacy user data"""
         if not legacy_user.school_id:
             return None
@@ -781,7 +786,7 @@ class UserMigrationService:
             school_role = self._map_legacy_role_to_school(legacy_user.role)
 
             # Create membership
-            membership = SchoolMembershipDB(
+            membership = SchoolMembership(
                 user_id=user_id,
                 school_id=legacy_user.school_id,
                 school_name=school_row.name,

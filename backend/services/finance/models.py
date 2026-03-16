@@ -105,7 +105,7 @@ class FeeStructure(Base, AuditMixin, SoftDeleteMixin):
         Index('idx_fee_structures_school_year', 'school_id', 'academic_year'),
         Index('idx_fee_structures_grade_levels', 'grade_level_min', 'grade_level_max'),
         Index('idx_fee_structures_active', 'is_active'),
-        {'schema': 'finance'}
+        {'schema': 'finance', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -163,7 +163,7 @@ class FeeStructureItem(Base, AuditMixin):
         CheckConstraint('display_order >= 0', name='non_negative_display_order'),
         Index('idx_fee_items_structure', 'fee_structure_id'),
         Index('idx_fee_items_type', 'fee_type'),
-        {'schema': 'finance'}
+        {'schema': 'finance', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -214,7 +214,7 @@ class Invoice(Base, AuditMixin, SoftDeleteMixin):
         Index('idx_invoices_status', 'status'),
         Index('idx_invoices_due_date', 'due_date'),
         Index('idx_invoices_academic_year', 'academic_year'),
-        {'schema': 'finance'}
+        {'schema': 'finance', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -297,7 +297,7 @@ class InvoiceItem(Base, AuditMixin):
         CheckConstraint('discount_amount >= 0', name='non_negative_item_discount'),
         Index('idx_invoice_items_invoice', 'invoice_id'),
         Index('idx_invoice_items_fee_type', 'fee_type'),
-        {'schema': 'finance'}
+        {'schema': 'finance', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -347,7 +347,7 @@ class Payment(Base, AuditMixin, SoftDeleteMixin):
         Index('idx_payments_status', 'status'),
         Index('idx_payments_method', 'payment_method'),
         Index('idx_payments_date', 'payment_date'),
-        {'schema': 'finance'}
+        {'schema': 'finance', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -421,7 +421,7 @@ class PaymentMethodConfig(Base, AuditMixin, SoftDeleteMixin):
         CheckConstraint('display_order >= 0', name='non_negative_display_order'),
         Index('idx_payment_methods_school', 'school_id'),
         Index('idx_payment_methods_active', 'is_active'),
-        {'schema': 'finance'}
+        {'schema': 'finance', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -473,7 +473,7 @@ class FinancialPeriod(Base, AuditMixin):
         CheckConstraint("status IN ('active', 'closed', 'archived')", name='valid_period_status'),
         Index('idx_financial_periods_school', 'school_id'),
         Index('idx_financial_periods_dates', 'start_date', 'end_date'),
-        {'schema': 'finance'}
+        {'schema': 'finance', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -519,7 +519,7 @@ class StudentAccount(Base, AuditMixin, SoftDeleteMixin):
         Index('idx_student_accounts_school', 'school_id'),
         Index('idx_student_accounts_student', 'student_id'),
         Index('idx_student_accounts_balance', 'current_balance'),
-        {'schema': 'finance'}
+        {'schema': 'finance', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)

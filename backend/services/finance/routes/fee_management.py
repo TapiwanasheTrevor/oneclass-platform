@@ -8,7 +8,7 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
 
-from shared.auth import get_current_active_user
+from shared.auth import get_current_active_user, require_feature, EnhancedUser
 from shared.models.platform_user import PlatformUser, PlatformRole
 from shared.services.api_integration_service import require_permission
 from ..schemas import (

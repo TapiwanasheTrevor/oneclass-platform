@@ -1,346 +1,303 @@
+'use client';
+
 // =====================================================
-// Enhanced Authentication Hook for Consolidated User System
+// Consolidated Authentication Hook
+// Bridges Clerk identity → backend /auth/me → school context
 // File: frontend/hooks/useAuth.ts
 // =====================================================
 
-import { api, wsManager } from '@/lib/api';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useUser, useAuth as useClerkAuthHook } from '@clerk/nextjs';
+import { api, setAuthTokenGetter, setCurrentSchoolId } from '@/lib/api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
-// Platform roles
-export enum PlatformRole {
-  SUPER_ADMIN = "super_admin",
-  SCHOOL_ADMIN = "school_admin",
-  REGISTRAR = "registrar",
-  TEACHER = "teacher",
-  PARENT = "parent",
-  STUDENT = "student",
-  STAFF = "staff"
+// ---- Enums (aligned with backend) ----
+
+export enum GlobalRole {
+  SUPER_ADMIN = 'super_admin',
+  PLATFORM_ADMIN = 'platform_admin',
+  REGIONAL_ADMIN = 'regional_admin',
+  EDUCATION_OFFICER = 'education_officer',
+  SYSTEM_USER = 'system_user',
 }
 
-// School roles
 export enum SchoolRole {
-  PRINCIPAL = "principal",
-  DEPUTY_PRINCIPAL = "deputy_principal",
-  ACADEMIC_HEAD = "academic_head",
-  DEPARTMENT_HEAD = "department_head",
-  TEACHER = "teacher",
-  FORM_TEACHER = "form_teacher",
-  REGISTRAR = "registrar",
-  BURSAR = "bursar",
-  LIBRARIAN = "librarian",
-  IT_SUPPORT = "it_support",
-  SECURITY = "security",
-  PARENT = "parent",
-  STUDENT = "student"
+  PRINCIPAL = 'principal',
+  DEPUTY_PRINCIPAL = 'deputy_principal',
+  ACADEMIC_HEAD = 'academic_head',
+  DEPARTMENT_HEAD = 'department_head',
+  TEACHER = 'teacher',
+  FORM_TEACHER = 'form_teacher',
+  REGISTRAR = 'registrar',
+  BURSAR = 'bursar',
+  LIBRARIAN = 'librarian',
+  IT_SUPPORT = 'it_support',
+  SECURITY = 'security',
+  PARENT = 'parent',
+  GUARDIAN = 'guardian',
+  STUDENT = 'student',
+  PREFECT = 'prefect',
+  SCHOOL_ADMIN = 'school_admin',
+  SUPPORT_STAFF = 'support_staff',
+  VOLUNTEER = 'volunteer',
 }
 
-// User status
+export enum MembershipStatus {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  SUSPENDED = 'suspended',
+  PENDING = 'pending',
+  ARCHIVED = 'archived',
+}
+
 export enum UserStatus {
-  ACTIVE = "active",
-  INACTIVE = "inactive",
-  SUSPENDED = "suspended",
-  PENDING_VERIFICATION = "pending_verification",
-  ARCHIVED = "archived"
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  SUSPENDED = 'suspended',
+  PENDING_VERIFICATION = 'pending_verification',
+  ARCHIVED = 'archived',
 }
 
-// User profile interface
-interface UserProfile {
-  phone_number?: string;
-  profile_image_url?: string;
-  date_of_birth?: string;
-  gender?: string;
-  address?: string;
-  emergency_contact_name?: string;
-  emergency_contact_phone?: string;
-  bio?: string;
-  preferred_language: string;
-  timezone: string;
-  notification_preferences: {
-    email_notifications: boolean;
-    sms_notifications: boolean;
-    push_notifications: boolean;
-    marketing_emails: boolean;
-  };
-}
+// ---- Interfaces ----
 
-// School membership interface
-interface SchoolMembership {
+export interface SchoolMembership {
   school_id: string;
   school_name: string;
   school_subdomain: string;
   role: SchoolRole;
   permissions: string[];
-  joined_date: string;
-  status: UserStatus;
+  status: MembershipStatus;
+  joined_date?: string;
 
-  // Role-specific fields
+  // Role-specific
   student_id?: string;
   current_grade?: string;
   admission_date?: string;
-  graduation_date?: string;
-
   employee_id?: string;
   department?: string;
   hire_date?: string;
-  contract_type?: string;
-
   children_ids?: string[];
 }
 
-// Consolidated user interface
-interface PlatformUser {
+export interface PlatformUser {
   id: string;
   email: string;
   first_name: string;
   last_name: string;
-  full_name: string;
-  platform_role: PlatformRole;
+  display_name: string;
+  global_role: GlobalRole;
   status: UserStatus;
   primary_school_id?: string;
   school_memberships: SchoolMembership[];
-  profile?: UserProfile;
-  created_at: string;
-  last_login?: string;
-  feature_flags: Record<string, boolean>;
-  user_preferences: Record<string, any>;
+  clerk_user_id?: string;
+  is_email_verified: boolean;
+  last_login_at?: string;
+  login_count: number;
+  contact_information?: Record<string, any>;
+  personal_profile?: Record<string, any>;
+  user_preferences?: Record<string, any>;
 }
 
-interface AuthContextType {
+export interface AuthContextType {
+  // Identity (from Clerk)
+  isLoaded: boolean;
+  isSignedIn: boolean;
+
+  // Platform user (from backend /auth/me)
   user: PlatformUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+
+  // School context
   currentSchool: SchoolMembership | null;
   availableSchools: SchoolMembership[];
-  login: (email: string, password: string) => Promise<any>;
-  logout: () => void;
-  switchSchool: (schoolId: string) => void;
+  switchSchool: (schoolId: string) => Promise<void>;
+
+  // Permission & role checks
   hasPermission: (permission: string, schoolId?: string) => boolean;
   hasRole: (role: SchoolRole, schoolId?: string) => boolean;
-  canAccessFeature: (feature: string) => boolean;
   isPlatformAdmin: boolean;
   isSchoolAdmin: (schoolId?: string) => boolean;
-  token: string | null;
+
+  // Auth actions
+  signOut: () => Promise<void>;
 }
+
+// ---- Helper: check if Clerk is configured ----
+function isClerkConfigured(): boolean {
+  const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  return !!key && !key.includes('your-') && key.startsWith('pk_');
+}
+
+// ---- Main Hook ----
 
 export function useAuth(): AuthContextType {
   const queryClient = useQueryClient();
 
-  // Get token from localStorage
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+  // Clerk identity — only call hooks if Clerk is configured
+  // When Clerk is not configured, we fall back to localStorage token (dev mode)
+  const clerkConfigured = isClerkConfigured();
 
-  // Get current school from localStorage
-  const currentSchoolId = typeof window !== 'undefined'
-    ? localStorage.getItem('current_school_id')
-    : null;
+  // Always call hooks (React rules) — they return safe defaults when Clerk isn't mounted
+  const { user: clerkUser, isLoaded: clerkLoaded, isSignedIn: clerkSignedIn } = useUser();
+  const { getToken, signOut: clerkSignOut } = useClerkAuthHook();
 
-  // Get current user with new consolidated model
-  const { data: user, isLoading } = useQuery({
-    queryKey: ['current-user'],
-    queryFn: async () => {
-      if (!token) return null;
+  // Determine effective auth state
+  const isLoaded = clerkConfigured ? clerkLoaded : true;
+  const isSignedIn = clerkConfigured ? !!clerkSignedIn : !!(typeof window !== 'undefined' && localStorage.getItem('auth_token'));
 
+  // Wire up the API client's token getter (once)
+  const tokenGetterSet = useRef(false);
+  useEffect(() => {
+    if (clerkConfigured && !tokenGetterSet.current) {
+      setAuthTokenGetter(() => getToken());
+      tokenGetterSet.current = true;
+    }
+    return () => {
+      if (tokenGetterSet.current) {
+        setAuthTokenGetter(null);
+        tokenGetterSet.current = false;
+      }
+    };
+  }, [clerkConfigured, getToken]);
+
+  // Fetch platform user from backend
+  const { data: user = null, isLoading } = useQuery({
+    queryKey: ['platform-user', clerkConfigured ? clerkUser?.id : 'local'],
+    queryFn: async (): Promise<PlatformUser | null> => {
+      if (!isSignedIn) return null;
       const response = await api.get('/api/v1/auth/me');
       return response.data as PlatformUser;
     },
-    enabled: !!token,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 30 * 60 * 1000, // 30 minutes
+    enabled: isLoaded && isSignedIn,
+    staleTime: 5 * 60 * 1000,
     retry: (failureCount, error: any) => {
-      // Don't retry on auth errors
       if (error?.response?.status === 401) return false;
       return failureCount < 2;
     },
   });
 
-  // Get current school membership
-  const currentSchool = user && currentSchoolId
-    ? user.school_memberships.find(m => m.school_id === currentSchoolId) || null
-    : user?.school_memberships.find(m => m.school_id === user.primary_school_id) || user?.school_memberships[0] || null;
+  // Current school from localStorage or primary
+  const storedSchoolId = typeof window !== 'undefined'
+    ? localStorage.getItem('current_school_id')
+    : null;
 
-  // Available schools for user
-  const availableSchools = user?.school_memberships.filter(m => m.status === UserStatus.ACTIVE) || [];
+  const currentSchool = useMemo(() => {
+    if (!user) return null;
+    const active = user.school_memberships.filter(m => m.status === MembershipStatus.ACTIVE);
+    // 1. stored selection, 2. primary, 3. first active
+    return active.find(m => m.school_id === storedSchoolId)
+      || active.find(m => m.school_id === user.primary_school_id)
+      || active[0]
+      || null;
+  }, [user, storedSchoolId]);
 
-  // Set up WebSocket connection when user is authenticated
+  const availableSchools = useMemo(
+    () => user?.school_memberships.filter(m => m.status === MembershipStatus.ACTIVE) || [],
+    [user],
+  );
+
+  // Keep API client's school header in sync
   useEffect(() => {
-    if (user && token) {
-      wsManager.connect(token);
-    } else {
-      wsManager.disconnect();
-    }
+    setCurrentSchoolId(currentSchool?.school_id ?? null);
+  }, [currentSchool?.school_id]);
 
-    return () => {
-      wsManager.disconnect();
-    };
-  }, [user, token]);
-
-  // Login mutation
-  const loginMutation = useMutation({
-    mutationFn: async ({ email, password }: { email: string; password: string }) => {
-      const response = await api.post('/api/v1/auth/login', { email, password });
-      return response.data;
-    },
-    onSuccess: (data) => {
-      localStorage.setItem('auth_token', data.access_token);
-      localStorage.setItem('refresh_token', data.refresh_token);
-      queryClient.setQueryData(['current-user'], data.user);
-
-      // Set default school
-      if (data.user.primary_school_id) {
-        localStorage.setItem('current_school_id', data.user.primary_school_id);
-      } else if (data.user.school_memberships.length > 0) {
-        localStorage.setItem('current_school_id', data.user.school_memberships[0].school_id);
-      }
-
-      queryClient.invalidateQueries({ queryKey: ['current-user'] });
-    },
-  });
-
-  // Logout function
-  const logout = async () => {
-    try {
-      // Call logout endpoint
-      await api.post('/api/v1/auth/logout');
-    } catch (error) {
-      // Continue with logout even if API call fails
-      console.error('Logout API error:', error);
-    }
-
-    // Clean up local storage
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('current_school_id');
-
-    // Disconnect WebSocket
-    wsManager.disconnect();
-
-    // Clear all cached data
-    queryClient.setQueryData(['current-user'], null);
-    queryClient.clear();
-  };
-
-  // Switch school context
-  const switchSchool = async (schoolId: string) => {
+  // Switch school
+  const switchSchool = useCallback(async (schoolId: string) => {
     if (!user?.school_memberships.some(m => m.school_id === schoolId)) return;
     try {
       const resp = await api.post('/api/v1/auth/switch-school', { school_id: schoolId });
-      const { access_token, current_school } = resp.data || {};
-      if (access_token) {
-        localStorage.setItem('auth_token', access_token);
-      }
-      if (current_school?.school_id) {
-        localStorage.setItem('current_school_id', current_school.school_id);
-      } else {
-        localStorage.setItem('current_school_id', schoolId);
-      }
+      const { current_school } = resp.data || {};
+      const newSchoolId = current_school?.school_id || schoolId;
+      setCurrentSchoolId(newSchoolId);
       await queryClient.invalidateQueries();
     } catch (e) {
       console.error('Failed to switch school', e);
     }
-  };
+  }, [user, queryClient]);
+
+  // Sign out
+  const signOut = useCallback(async () => {
+    try {
+      if (clerkConfigured) {
+        await clerkSignOut();
+      }
+    } catch (e) {
+      console.error('Sign out error:', e);
+    }
+    // Clean up local state regardless
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('current_school_id');
+    }
+    setCurrentSchoolId(null);
+    queryClient.setQueryData(['platform-user', clerkConfigured ? clerkUser?.id : 'local'], null);
+    queryClient.clear();
+  }, [clerkConfigured, clerkSignOut, clerkUser?.id, queryClient]);
 
   // Permission checking
-  const hasPermission = (permission: string, schoolId?: string): boolean => {
+  const hasPermission = useCallback((permission: string, schoolId?: string): boolean => {
     if (!user) return false;
+    if (user.global_role === GlobalRole.SUPER_ADMIN || user.global_role === GlobalRole.PLATFORM_ADMIN) return true;
 
-    // Super admin has all permissions
-    if (user.platform_role === PlatformRole.SUPER_ADMIN) return true;
+    const targetId = schoolId || currentSchool?.school_id;
+    if (!targetId) return false;
 
-    const targetSchoolId = schoolId || currentSchool?.school_id;
-    if (!targetSchoolId) return false;
-
-    const membership = user.school_memberships.find(m => m.school_id === targetSchoolId);
+    const membership = user.school_memberships.find(m => m.school_id === targetId);
     if (!membership) return false;
-
     return membership.permissions.includes(permission) || membership.permissions.includes('*');
-  };
+  }, [user, currentSchool]);
 
-  // Role checking
-  const hasRole = (role: SchoolRole, schoolId?: string): boolean => {
+  const hasRole = useCallback((role: SchoolRole, schoolId?: string): boolean => {
     if (!user) return false;
-
-    const targetSchoolId = schoolId || currentSchool?.school_id;
-    if (!targetSchoolId) return false;
-
-    const membership = user.school_memberships.find(m => m.school_id === targetSchoolId);
+    const targetId = schoolId || currentSchool?.school_id;
+    if (!targetId) return false;
+    const membership = user.school_memberships.find(m => m.school_id === targetId);
     return membership?.role === role;
-  };
+  }, [user, currentSchool]);
 
-  // Feature access checking
-  const canAccessFeature = (feature: string): boolean => {
-    if (!user) return false;
+  const isPlatformAdmin = user?.global_role === GlobalRole.SUPER_ADMIN
+    || user?.global_role === GlobalRole.PLATFORM_ADMIN;
 
-    // Check user feature flags
-    if (user.feature_flags.hasOwnProperty(feature)) {
-      return user.feature_flags[feature];
-    }
-
-    // Default feature access based on role
-    const defaultFeatures: Record<PlatformRole, string[]> = {
-      [PlatformRole.SUPER_ADMIN]: ['*'],
-      [PlatformRole.SCHOOL_ADMIN]: [
-        'student_management', 'staff_management', 'finance_module',
-        'reports', 'settings', 'migration_services'
-      ],
-      [PlatformRole.REGISTRAR]: ['student_management', 'documents', 'reports'],
-      [PlatformRole.TEACHER]: ['student_management', 'attendance', 'gradebook'],
-      [PlatformRole.PARENT]: ['student_portal', 'payments', 'communication'],
-      [PlatformRole.STUDENT]: ['student_portal', 'assignments'],
-      [PlatformRole.STAFF]: ['basic_access']
-    };
-
-    const userFeatures = defaultFeatures[user.platform_role] || [];
-    return userFeatures.includes('*') || userFeatures.includes(feature);
-  };
-
-  // Admin checks
-  const isPlatformAdmin = user?.platform_role === PlatformRole.SUPER_ADMIN;
-
-  const isSchoolAdmin = (schoolId?: string): boolean => {
+  const isSchoolAdmin = useCallback((schoolId?: string): boolean => {
     if (!user) return false;
     if (isPlatformAdmin) return true;
-
-    const targetSchoolId = schoolId || currentSchool?.school_id;
-    if (!targetSchoolId) return false;
-
-    const membership = user.school_memberships.find(m => m.school_id === targetSchoolId);
-    return membership?.role === SchoolRole.PRINCIPAL ||
-      membership?.role === SchoolRole.DEPUTY_PRINCIPAL ||
-      user.platform_role === PlatformRole.SCHOOL_ADMIN;
-  };
+    const targetId = schoolId || currentSchool?.school_id;
+    if (!targetId) return false;
+    const membership = user.school_memberships.find(m => m.school_id === targetId);
+    return membership?.role === SchoolRole.PRINCIPAL
+      || membership?.role === SchoolRole.DEPUTY_PRINCIPAL
+      || membership?.role === SchoolRole.SCHOOL_ADMIN;
+  }, [user, isPlatformAdmin, currentSchool]);
 
   return {
+    isLoaded,
+    isSignedIn,
     user,
     isLoading,
     isAuthenticated: !!user,
     currentSchool,
     availableSchools,
-    login: async (email: string, password: string) => {
-      return await loginMutation.mutateAsync({ email, password });
-    },
-    logout,
     switchSchool,
     hasPermission,
     hasRole,
-    canAccessFeature,
     isPlatformAdmin,
     isSchoolAdmin,
-    token
+    signOut,
   };
 }
 
-// Helper hooks for specific use cases
+// ---- Helper hooks ----
+
 export function usePermissions() {
-  const { hasPermission, hasRole, canAccessFeature, isPlatformAdmin, isSchoolAdmin } = useAuth();
+  const { hasPermission, hasRole, isPlatformAdmin, isSchoolAdmin } = useAuth();
 
   return {
     hasPermission,
     hasRole,
-    canAccessFeature,
     isPlatformAdmin,
     isSchoolAdmin,
-
-    // Common permission checks
     canManageUsers: (schoolId?: string) => hasPermission('users.manage', schoolId) || isSchoolAdmin(schoolId),
     canManageFinance: (schoolId?: string) => hasPermission('finance.manage', schoolId) || hasRole(SchoolRole.BURSAR, schoolId),
     canViewReports: (schoolId?: string) => hasPermission('reports.view', schoolId) || isSchoolAdmin(schoolId),
@@ -348,7 +305,6 @@ export function usePermissions() {
   };
 }
 
-// School context hook
 export function useSchoolContext() {
   const { user, currentSchool, switchSchool, availableSchools } = useAuth();
 
@@ -357,11 +313,11 @@ export function useSchoolContext() {
     availableSchools,
     switchSchool,
     hasMultipleSchools: availableSchools.length > 1,
-
-    // School-specific getters
     getCurrentSchoolId: () => currentSchool?.school_id,
     getCurrentSchoolName: () => currentSchool?.school_name,
     getUserRoleInCurrentSchool: () => currentSchool?.role,
     getUserPermissionsInCurrentSchool: () => currentSchool?.permissions || [],
   };
 }
+
+export default useAuth;

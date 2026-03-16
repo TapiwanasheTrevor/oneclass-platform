@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAuth, useSchoolContext, PlatformRole, SchoolRole } from '@/hooks/useAuth';
+import { useAuth, useSchoolContext, GlobalRole, SchoolRole } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   Bell,
@@ -42,13 +42,13 @@ interface NavigationItem {
   label: string;
   href: string;
   icon: React.ReactNode;
-  roles?: PlatformRole[] | SchoolRole[];
+  roles?: GlobalRole[] | SchoolRole[];
   permissions?: string[];
   badge?: string;
 }
 
 export function PlatformNavigation() {
-  const { user, logout, isPlatformAdmin, isSchoolAdmin } = useAuth();
+  const { user, signOut, isPlatformAdmin, isSchoolAdmin } = useAuth();
   const { currentSchool, availableSchools, switchSchool, hasMultipleSchools } = useSchoolContext();
   const router = useRouter();
   const pathname = usePathname();
@@ -67,25 +67,25 @@ export function PlatformNavigation() {
           label: 'Platform Overview',
           href: '/super-admin',
           icon: <Globe className="w-4 h-4" />,
-          roles: [PlatformRole.SUPER_ADMIN]
+          roles: [GlobalRole.SUPER_ADMIN]
         },
         {
           label: 'Schools Management',
           href: '/super-admin/schools',
           icon: <Building2 className="w-4 h-4" />,
-          roles: [PlatformRole.SUPER_ADMIN]
+          roles: [GlobalRole.SUPER_ADMIN]
         },
         {
           label: 'Platform Analytics',
           href: '/super-admin/analytics',
           icon: <BarChart3 className="w-4 h-4" />,
-          roles: [PlatformRole.SUPER_ADMIN]
+          roles: [GlobalRole.SUPER_ADMIN]
         },
         {
           label: 'System Settings',
           href: '/super-admin/settings',
           icon: <Settings className="w-4 h-4" />,
-          roles: [PlatformRole.SUPER_ADMIN]
+          roles: [GlobalRole.SUPER_ADMIN]
         }
       );
     }
@@ -212,7 +212,7 @@ export function PlatformNavigation() {
 
   const getRoleDisplayName = () => {
     if (isPlatformAdmin) return 'Platform Administrator';
-    if (!currentSchool) return user.platform_role.replace('_', ' ').toUpperCase();
+    if (!currentSchool) return (user.global_role || '').replace('_', ' ').toUpperCase();
     
     const schoolRole = currentSchool.role.replace('_', ' ').toLowerCase()
       .replace(/\b\w/g, l => l.toUpperCase());
@@ -311,7 +311,7 @@ export function PlatformNavigation() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={user.profile?.profile_image_url} alt={getUserDisplayName()} />
+                  <AvatarImage src={user.personal_profile?.profile_image_url} alt={getUserDisplayName()} />
                   <AvatarFallback>{getUserInitials()}</AvatarFallback>
                 </Avatar>
               </Button>
@@ -344,7 +344,7 @@ export function PlatformNavigation() {
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={logout}>
+              <DropdownMenuItem onClick={signOut}>
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Log out</span>
               </DropdownMenuItem>

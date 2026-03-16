@@ -14,7 +14,7 @@ import logging
 import json
 
 from shared.models.platform_user import (
-    PlatformUserDB, SchoolMembershipDB, UserSessionDB,
+    PlatformUser, SchoolMembership, UserSession,
     PlatformRole, SchoolRole, UserStatus
 )
 from shared.models.platform import School
@@ -56,13 +56,13 @@ class UserManagementService:
         db: AsyncSession,
         user_data: UserCreateRequest,
         created_by: UUID
-    ) -> PlatformUserDB:
+    ) -> PlatformUser:
         """Create a new user with optional school memberships"""
         
         try:
             # Check if email already exists
-            existing_query = select(PlatformUserDB).where(
-                PlatformUserDB.email == user_data.email.lower()
+            existing_query = select(PlatformUser).where(
+                PlatformUser.email == user_data.email.lower()
             )
             existing_result = await db.execute(existing_query)
             existing_user = existing_result.scalar_one_or_none()
@@ -89,7 +89,7 @@ class UserManagementService:
             }
             
             # Create user
-            user = PlatformUserDB(
+            user = PlatformUser(
                 id=uuid4(),
                 email=user_data.email.lower(),
                 first_name=user_data.first_name,
@@ -108,7 +108,7 @@ class UserManagementService:
             
             # Create school memberships
             for membership_data in user_data.school_memberships:
-                membership = SchoolMembershipDB(
+                membership = SchoolMembership(
                     id=uuid4(),
                     user_id=user.id,
                     school_id=UUID(membership_data['school_id']),
@@ -148,13 +148,13 @@ class UserManagementService:
         db: AsyncSession,
         user_id: UUID,
         include_memberships: bool = True
-    ) -> Optional[PlatformUserDB]:
+    ) -> Optional[PlatformUser]:
         """Get user by ID with optional school memberships"""
         
-        query = select(PlatformUserDB).where(PlatformUserDB.id == user_id)
+        query = select(PlatformUser).where(PlatformUser.id == user_id)
         
         if include_memberships:
-            query = query.options(selectinload(PlatformUserDB.school_memberships))
+            query = query.options(selectinload(PlatformUser.school_memberships))
         
         result = await db.execute(query)
         return result.scalar_one_or_none()
@@ -164,15 +164,15 @@ class UserManagementService:
         db: AsyncSession,
         email: str,
         include_memberships: bool = True
-    ) -> Optional[PlatformUserDB]:
+    ) -> Optional[PlatformUser]:
         """Get user by email with optional school memberships"""
         
-        query = select(PlatformUserDB).where(
-            PlatformUserDB.email == email.lower()
+        query = select(PlatformUser).where(
+            PlatformUser.email == email.lower()
         )
         
         if include_memberships:
-            query = query.options(selectinload(PlatformUserDB.school_memberships))
+            query = query.options(selectinload(PlatformUser.school_memberships))
         
         result = await db.execute(query)
         return result.scalar_one_or_none()
@@ -183,7 +183,7 @@ class UserManagementService:
         user_id: UUID,
         user_data: UserUpdateRequest,
         updated_by: UUID
-    ) -> PlatformUserDB:
+    ) -> PlatformUser:
         """Update user information"""
         
         try:
@@ -293,20 +293,20 @@ class UserManagementService:
             if permanent:
                 # Permanent deletion - remove all data
                 # First delete school memberships
-                membership_delete = delete(SchoolMembershipDB).where(
-                    SchoolMembershipDB.user_id == user_id
+                membership_delete = delete(SchoolMembership).where(
+                    SchoolMembership.user_id == user_id
                 )
                 await db.execute(membership_delete)
                 
                 # Delete user sessions
-                session_delete = delete(UserSessionDB).where(
-                    UserSessionDB.user_id == user_id
+                session_delete = delete(UserSession).where(
+                    UserSession.user_id == user_id
                 )
                 await db.execute(session_delete)
                 
                 # Delete user
-                user_delete = delete(PlatformUserDB).where(
-                    PlatformUserDB.id == user_id
+                user_delete = delete(PlatformUser).where(
+                    PlatformUser.id == user_id
                 )
                 await db.execute(user_delete)
                 
@@ -317,8 +317,8 @@ class UserManagementService:
                 user.updated_at = datetime.utcnow()
                 
                 # Deactivate all sessions
-                session_update = update(UserSessionDB).where(
-                    UserSessionDB.user_id == user_id
+                session_update = update(UserSession).where(
+                    UserSession.user_id == user_id
                 ).values(is_active=False)
                 await db.execute(session_update)
                 
@@ -345,12 +345,12 @@ class UserManagementService:
         self,
         db: AsyncSession,
         search_params: UserSearchRequest
-    ) -> Tuple[List[PlatformUserDB], int]:
+    ) -> Tuple[List[PlatformUser], int]:
         """Search users with filters and pagination"""
         
         # Base query
-        query = select(PlatformUserDB)
-        count_query = select(func.count(PlatformUserDB.id))
+        query = select(PlatformUser)
+        count_query = select(func.count(PlatformUser.id))
         
         # Apply filters
         filters = []
@@ -360,15 +360,15 @@ class UserManagementService:
             search_term = f"%{search_params.query.lower()}%"
             filters.append(
                 or_(
-                    func.lower(PlatformUserDB.first_name).like(search_term),
-                    func.lower(PlatformUserDB.last_name).like(search_term),
-                    func.lower(PlatformUserDB.email).like(search_term)
+                    func.lower(PlatformUser.first_name).like(search_term),
+                    func.lower(PlatformUser.last_name).like(search_term),
+                    func.lower(PlatformUser.email).like(search_term)
                 )
             )
         
         # Platform role filter
         if search_params.platform_role:
-            filters.append(PlatformUserDB.platform_role == search_params.platform_role.value)
+            filters.append(PlatformUser.platform_role == search_params.platform_role.value)
         
         # Status filter
         if search_params.status != UserFilterBy.ALL:
@@ -378,34 +378,34 @@ class UserManagementService:
                 UserFilterBy.PENDING: UserStatus.PENDING_VERIFICATION.value,
                 UserFilterBy.SUSPENDED: UserStatus.SUSPENDED.value
             }
-            filters.append(PlatformUserDB.status == status_mapping[search_params.status])
+            filters.append(PlatformUser.status == status_mapping[search_params.status])
         
         # Date filters
         if search_params.created_after:
-            filters.append(PlatformUserDB.created_at >= search_params.created_after)
+            filters.append(PlatformUser.created_at >= search_params.created_after)
         if search_params.created_before:
-            filters.append(PlatformUserDB.created_at <= search_params.created_before)
+            filters.append(PlatformUser.created_at <= search_params.created_before)
         if search_params.last_login_after:
-            filters.append(PlatformUserDB.last_login >= search_params.last_login_after)
+            filters.append(PlatformUser.last_login >= search_params.last_login_after)
         if search_params.last_login_before:
-            filters.append(PlatformUserDB.last_login <= search_params.last_login_before)
+            filters.append(PlatformUser.last_login <= search_params.last_login_before)
         
         # School-specific filters
         if search_params.school_id:
             # Join with school memberships
-            query = query.join(SchoolMembershipDB).where(
-                SchoolMembershipDB.school_id == search_params.school_id
+            query = query.join(SchoolMembership).where(
+                SchoolMembership.school_id == search_params.school_id
             )
-            count_query = count_query.join(SchoolMembershipDB).where(
-                SchoolMembershipDB.school_id == search_params.school_id
+            count_query = count_query.join(SchoolMembership).where(
+                SchoolMembership.school_id == search_params.school_id
             )
             
             if search_params.school_role:
-                filters.append(SchoolMembershipDB.role == search_params.school_role.value)
+                filters.append(SchoolMembership.role == search_params.school_role.value)
             if search_params.department:
-                filters.append(SchoolMembershipDB.department.ilike(f"%{search_params.department}%"))
+                filters.append(SchoolMembership.department.ilike(f"%{search_params.department}%"))
             if search_params.grade:
-                filters.append(SchoolMembershipDB.current_grade.ilike(f"%{search_params.grade}%"))
+                filters.append(SchoolMembership.current_grade.ilike(f"%{search_params.grade}%"))
         
         # Apply all filters
         if filters:
@@ -418,7 +418,7 @@ class UserManagementService:
         total_count = count_result.scalar()
         
         # Apply sorting
-        sort_column = getattr(PlatformUserDB, search_params.sort_by.value)
+        sort_column = getattr(PlatformUser, search_params.sort_by.value)
         if search_params.sort_desc:
             query = query.order_by(sort_column.desc())
         else:
@@ -527,11 +527,11 @@ class UserManagementService:
         """Get user statistics for dashboard"""
         
         # Base query
-        base_query = select(PlatformUserDB)
+        base_query = select(PlatformUser)
         
         if school_id:
-            base_query = base_query.join(SchoolMembershipDB).where(
-                SchoolMembershipDB.school_id == school_id
+            base_query = base_query.join(SchoolMembership).where(
+                SchoolMembership.school_id == school_id
             )
         
         # Total users
@@ -541,14 +541,14 @@ class UserManagementService:
         # Users by status
         status_counts = {}
         for status in UserStatus:
-            status_query = base_query.where(PlatformUserDB.status == status.value)
+            status_query = base_query.where(PlatformUser.status == status.value)
             count_result = await db.execute(select(func.count()).select_from(status_query.subquery()))
             status_counts[status.value] = count_result.scalar()
         
         # Users by role
         role_counts = {}
         for role in PlatformRole:
-            role_query = base_query.where(PlatformUserDB.platform_role == role.value)
+            role_query = base_query.where(PlatformUser.platform_role == role.value)
             count_result = await db.execute(select(func.count()).select_from(role_query.subquery()))
             role_counts[role.value] = count_result.scalar()
         
@@ -556,15 +556,15 @@ class UserManagementService:
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
         seven_days_ago = datetime.utcnow() - timedelta(days=7)
         
-        new_users_query = base_query.where(PlatformUserDB.created_at >= thirty_days_ago)
+        new_users_query = base_query.where(PlatformUser.created_at >= thirty_days_ago)
         new_users_result = await db.execute(select(func.count()).select_from(new_users_query.subquery()))
         new_users_last_30_days = new_users_result.scalar()
         
-        active_users_query = base_query.where(PlatformUserDB.last_login >= seven_days_ago)
+        active_users_query = base_query.where(PlatformUser.last_login >= seven_days_ago)
         active_users_result = await db.execute(select(func.count()).select_from(active_users_query.subquery()))
         active_users_last_7_days = active_users_result.scalar()
         
-        never_logged_in_query = base_query.where(PlatformUserDB.last_login.is_(None))
+        never_logged_in_query = base_query.where(PlatformUser.last_login.is_(None))
         never_logged_in_result = await db.execute(select(func.count()).select_from(never_logged_in_query.subquery()))
         users_never_logged_in = never_logged_in_result.scalar()
         
@@ -609,7 +609,7 @@ class UserManagementService:
         
         logger.info(f"User action logged: {json.dumps(log_entry)}")
     
-    def _calculate_profile_completion(self, user: PlatformUserDB) -> float:
+    def _calculate_profile_completion(self, user: PlatformUser) -> float:
         """Calculate profile completion percentage"""
         
         if not user.profile:

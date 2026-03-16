@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { useAuth, PlatformRole, SchoolRole } from '@/hooks/useAuth';
+import { useAuth, SchoolRole } from '@/hooks/useAuth';
 import { OnboardingWizard } from './OnboardingWizard';
 
 interface InvitationData {
@@ -25,7 +25,7 @@ interface InvitationData {
   school_id: string;
   school_name: string;
   school_subdomain: string;
-  invited_role: PlatformRole;
+  invited_role: SchoolRole;
   school_role: SchoolRole;
   inviter_name: string;
   inviter_role: string;
@@ -59,7 +59,7 @@ export const InvitationHandler: React.FC<InvitationHandlerProps> = ({
   onAccepted,
   onDeclined
 }) => {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   
   const [invitation, setInvitation] = useState<InvitationData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,11 +74,7 @@ export const InvitationHandler: React.FC<InvitationHandlerProps> = ({
   const fetchInvitationDetails = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/v1/invitations/${invitationToken}`, {
-        headers: {
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      });
+      const response = await fetch(`/api/v1/invitations/${invitationToken}`);
 
       if (response.ok) {
         const invitationData = await response.json();
@@ -119,7 +115,6 @@ export const InvitationHandler: React.FC<InvitationHandlerProps> = ({
         const response = await fetch(`/api/v1/invitations/${invitationToken}/accept`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
         });
@@ -150,7 +145,6 @@ export const InvitationHandler: React.FC<InvitationHandlerProps> = ({
       const response = await fetch(`/api/v1/invitations/${invitationToken}/decline`, {
         method: 'POST',
         headers: {
-          ...(token && { Authorization: `Bearer ${token}` }),
           'Content-Type': 'application/json',
         },
       });
@@ -174,15 +168,15 @@ export const InvitationHandler: React.FC<InvitationHandlerProps> = ({
     onAccepted?.();
   };
 
-  const getRoleIcon = (role: PlatformRole) => {
+  const getRoleIcon = (role: SchoolRole) => {
     switch (role) {
-      case PlatformRole.TEACHER:
+      case SchoolRole.TEACHER:
         return <GraduationCap className="h-6 w-6 text-green-600" />;
-      case PlatformRole.PARENT:
+      case SchoolRole.PARENT:
         return <Heart className="h-6 w-6 text-pink-600" />;
-      case PlatformRole.STUDENT:
+      case SchoolRole.STUDENT:
         return <Users className="h-6 w-6 text-blue-600" />;
-      case PlatformRole.STAFF:
+      case SchoolRole.SUPPORT_STAFF:
         return <Users className="h-6 w-6 text-purple-600" />;
       default:
         return <Users className="h-6 w-6 text-gray-600" />;

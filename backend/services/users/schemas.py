@@ -10,7 +10,7 @@ from datetime import datetime, date
 from uuid import UUID
 from enum import Enum
 
-from shared.models.platform_user import PlatformRole, SchoolRole, UserStatus
+from shared.models.platform_user import GlobalRole, PlatformRole, SchoolRole, UserStatus
 
 class UserSortBy(str, Enum):
     """User sorting options"""
@@ -43,7 +43,7 @@ class UserCreateRequest(BaseModel):
     email: EmailStr
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
-    platform_role: PlatformRole = PlatformRole.STUDENT
+    platform_role: GlobalRole = GlobalRole.SYSTEM_USER
     
     # Optional profile information
     phone: Optional[str] = Field(None, max_length=20)

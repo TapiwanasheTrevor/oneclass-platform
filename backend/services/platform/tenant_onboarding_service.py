@@ -19,8 +19,8 @@ from pydantic import BaseModel, Field, EmailStr, validator, root_validator
 
 from shared.database import get_async_session
 from shared.models.platform import School, SchoolSubscription
-from shared.models.unified_user import (
-    UnifiedUser, SchoolMembership, SchoolInvitation,
+from shared.models.platform_user import (
+    PlatformUser, SchoolMembership, UserInvitation as SchoolInvitation,
     GlobalRole, SchoolRole, MembershipStatus, UserStatus
 )
 
@@ -633,7 +633,7 @@ class TenantOnboardingService:
             # Create principal user account
             principal_info = onboarding_data["principal_info"]
             
-            principal_user = UnifiedUser(
+            principal_user = PlatformUser(
                 id=uuid4(),
                 email=principal_info["email"],
                 first_name=principal_info["name"].split()[0],
@@ -999,7 +999,7 @@ class TenantOnboardingService:
     async def _is_principal_email_taken(self, email: str) -> bool:
         """Check if principal email is already registered"""
         result = await self.db.execute(
-            select(func.count(UnifiedUser.id)).where(UnifiedUser.email == email.lower())
+            select(func.count(PlatformUser.id)).where(PlatformUser.email == email.lower())
         )
         count = result.scalar()
         return count > 0

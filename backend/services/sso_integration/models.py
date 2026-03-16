@@ -271,7 +271,7 @@ class SSOAuditLog(Base):
 # Add relationships to existing models
 # This would be added to the existing School and User models
 from shared.models.platform import School
-from shared.models.platform_user import PlatformUserDB as User
+from shared.models.platform_user import PlatformUser as User
 
 School.sso_providers = relationship("SSOProvider", back_populates="school")
 User.sso_sessions = relationship("SSOSession", back_populates="user")

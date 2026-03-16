@@ -38,7 +38,7 @@ user_service = UserManagementService()
 async def create_user(
     user_data: UserCreateRequest,
     background_tasks: BackgroundTasks,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -80,7 +80,7 @@ async def create_user(
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: UUID,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -119,7 +119,7 @@ async def get_user(
 async def update_user(
     user_id: UUID,
     user_data: UserUpdateRequest,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -163,7 +163,7 @@ async def update_user(
 async def delete_user(
     user_id: UUID,
     permanent: bool = Query(False, description="Permanently delete user"),
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -210,7 +210,7 @@ async def delete_user(
 @router.post("/search", response_model=UserListResponse)
 async def search_users(
     search_params: UserSearchRequest,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -286,7 +286,7 @@ async def search_users(
 @router.post("/bulk-operation")
 async def bulk_operation(
     operation_data: UserBulkOperationRequest,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -319,7 +319,7 @@ async def bulk_operation(
 @router.get("/statistics/overview", response_model=UserStatistics)
 async def get_user_statistics(
     school_id: Optional[UUID] = Query(None, description="Filter by school"),
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -347,7 +347,7 @@ async def get_user_statistics(
 async def update_user_profile(
     user_id: UUID,
     profile_data: UserProfileUpdateRequest,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -393,7 +393,7 @@ async def update_user_profile(
 async def reset_user_password(
     user_id: UUID,
     send_email: bool = Query(True, description="Send password reset email"),
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -444,7 +444,7 @@ async def reset_user_password(
 @router.get("/{user_id}/sessions")
 async def get_user_sessions(
     user_id: UUID,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -474,7 +474,7 @@ async def get_user_sessions(
 
 
 async def _convert_user_to_response(
-    db: AsyncSession, user: PlatformUserDB
+    db: AsyncSession, user: PlatformUser
 ) -> UserResponse:
     """Convert database user model to API response"""
 

@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field, EmailStr
 
 from shared.database import get_async_session
 from shared.models.platform import School, SchoolSubscription
-from shared.models.unified_user import UnifiedUser, SchoolMembership, GlobalRole, SchoolRole
+from shared.models.platform_user import PlatformUser, SchoolMembership, GlobalRole, SchoolRole
 from .tenant_onboarding_service import OnboardingStage, VerificationStatus, MigrationServicePackage
 
 import logging
@@ -634,7 +634,7 @@ class SuperAdminService:
                 raise ValueError("School not found")
             
             # Get manager details
-            manager_query = select(UnifiedUser).where(UnifiedUser.id == manager_id)
+            manager_query = select(PlatformUser).where(PlatformUser.id == manager_id)
             manager_result = await self.db.execute(manager_query)
             manager = manager_result.scalar_one_or_none()
             

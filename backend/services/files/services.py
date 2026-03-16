@@ -18,7 +18,7 @@ from PIL import Image
 import magic
 import mimetypes
 
-from shared.models.platform_user import PlatformUserDB
+from shared.models.platform_user import PlatformUser
 from shared.models.platform import School
 from .schemas import (
     FileMetadata, FileType, UploadPurpose, FileValidationResult,

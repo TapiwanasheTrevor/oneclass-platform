@@ -12,7 +12,7 @@ from uuid import UUID
 import logging
 
 from shared.database import get_async_session
-from shared.models.platform_user import PlatformUserDB
+from shared.models.platform_user import PlatformUser
 from shared.auth import get_current_active_user
 from .schemas import (
     EmailRequest, NotificationRequest, BulkEmailRequest, NotificationResponse,
@@ -35,7 +35,7 @@ template_service = EmailTemplateService()
 async def send_notification(
     notification: NotificationRequest,
     background_tasks: BackgroundTasks,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -70,7 +70,7 @@ async def send_notification(
 async def send_email(
     email_request: EmailRequest,
     background_tasks: BackgroundTasks,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -104,7 +104,7 @@ async def send_email(
 async def send_bulk_email(
     bulk_request: BulkEmailRequest,
     background_tasks: BackgroundTasks,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -148,7 +148,7 @@ async def send_bulk_email(
 async def schedule_notification(
     notification: NotificationRequest,
     send_at: datetime,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -195,7 +195,7 @@ async def schedule_notification(
 @router.get("/{notification_id}/status")
 async def get_notification_status(
     notification_id: str,
-    current_user: PlatformUserDB = Depends(get_current_active_user)
+    current_user: PlatformUser = Depends(get_current_active_user)
 ):
     """
     Get status of a notification
@@ -223,7 +223,7 @@ async def get_notification_status(
 @router.delete("/{notification_id}/cancel")
 async def cancel_scheduled_notification(
     notification_id: str,
-    current_user: PlatformUserDB = Depends(get_current_active_user)
+    current_user: PlatformUser = Depends(get_current_active_user)
 ):
     """
     Cancel a scheduled notification
@@ -251,7 +251,7 @@ async def cancel_scheduled_notification(
 @router.get("/email/{email_id}/status", response_model=EmailStatusResponse)
 async def get_email_status(
     email_id: str,
-    current_user: PlatformUserDB = Depends(get_current_active_user)
+    current_user: PlatformUser = Depends(get_current_active_user)
 ):
     """
     Get email delivery status with tracking data
@@ -278,7 +278,7 @@ async def get_email_status(
 
 @router.get("/templates", response_model=List[dict])
 async def list_email_templates(
-    current_user: PlatformUserDB = Depends(get_current_active_user)
+    current_user: PlatformUser = Depends(get_current_active_user)
 ):
     """
     List available email templates
@@ -297,7 +297,7 @@ async def list_email_templates(
 @router.get("/templates/{template_name}")
 async def get_email_template(
     template_name: str,
-    current_user: PlatformUserDB = Depends(get_current_active_user)
+    current_user: PlatformUser = Depends(get_current_active_user)
 ):
     """
     Get email template details
@@ -326,7 +326,7 @@ async def get_email_template(
 async def preview_email_template(
     template_name: str,
     template_data: dict,
-    current_user: PlatformUserDB = Depends(get_current_active_user)
+    current_user: PlatformUser = Depends(get_current_active_user)
 ):
     """
     Preview email template with data
@@ -350,7 +350,7 @@ async def preview_email_template(
 @router.put("/preferences", response_model=dict)
 async def update_notification_preferences(
     preferences: NotificationPreferences,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -385,7 +385,7 @@ async def update_notification_preferences(
 async def get_notification_statistics(
     days: int = Query(30, ge=1, le=365),
     school_id: Optional[UUID] = Query(None),
-    current_user: PlatformUserDB = Depends(get_current_active_user)
+    current_user: PlatformUser = Depends(get_current_active_user)
 ):
     """
     Get notification statistics
@@ -441,7 +441,7 @@ async def get_email_delivery_report(
     start_date: datetime = Query(...),
     end_date: datetime = Query(...),
     school_id: Optional[str] = Query(None),
-    current_user: PlatformUserDB = Depends(get_current_active_user)
+    current_user: PlatformUser = Depends(get_current_active_user)
 ):
     """
     Get email delivery report
@@ -468,7 +468,7 @@ async def get_email_delivery_report(
 
 @router.get("/health")
 async def get_service_health(
-    current_user: PlatformUserDB = Depends(get_current_active_user)
+    current_user: PlatformUser = Depends(get_current_active_user)
 ):
     """
     Get notification service health status

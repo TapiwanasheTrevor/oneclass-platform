@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { useAuth, PlatformRole, SchoolRole, UserStatus } from '@/hooks/useAuth';
+import { useAuth, SchoolRole, UserStatus } from '@/hooks/useAuth';
 
 interface OnboardingData {
   // User basic info
@@ -41,7 +41,7 @@ interface OnboardingData {
   invitationToken?: string;
   
   // Role and school info
-  primaryRole: PlatformRole;
+  primaryRole: SchoolRole;
   schoolMemberships: {
     schoolId: string;
     schoolName: string;
@@ -307,28 +307,28 @@ const BasicInfoStep: React.FC<{ data: OnboardingData; updateData: (data: Partial
 const RoleSelectionStep: React.FC<{ data: OnboardingData; updateData: (data: Partial<OnboardingData>) => void; }> = ({
   data, updateData
 }) => {
-  const [availableRoles, setAvailableRoles] = useState<{ role: PlatformRole; description: string; icon: React.ReactNode }[]>([]);
+  const [availableRoles, setAvailableRoles] = useState<{ role: SchoolRole; description: string; icon: React.ReactNode }[]>([]);
 
   useEffect(() => {
     // Get available roles based on invitation or school context
     const roles = [
       {
-        role: PlatformRole.TEACHER,
+        role: SchoolRole.TEACHER,
         description: 'Teach classes, manage grades, and communicate with students and parents',
         icon: <GraduationCap className="h-6 w-6 text-green-600" />
       },
       {
-        role: PlatformRole.PARENT,
+        role: SchoolRole.PARENT,
         description: 'Track your children\'s academic progress and communicate with teachers',
         icon: <Heart className="h-6 w-6 text-pink-600" />
       },
       {
-        role: PlatformRole.STUDENT,
+        role: SchoolRole.STUDENT,
         description: 'Access assignments, grades, and school resources',
         icon: <BookOpen className="h-6 w-6 text-blue-600" />
       },
       {
-        role: PlatformRole.STAFF,
+        role: SchoolRole.SUPPORT_STAFF,
         description: 'Support school operations and student services',
         icon: <Users className="h-6 w-6 text-purple-600" />
       }
@@ -394,15 +394,15 @@ const SchoolSpecificStep: React.FC<{ data: OnboardingData; updateData: (data: Pa
 
   useEffect(() => {
     // Get appropriate school roles based on primary role
-    const getRolesForPrimaryRole = (primaryRole: PlatformRole): SchoolRole[] => {
+    const getRolesForPrimaryRole = (primaryRole: SchoolRole): SchoolRole[] => {
       switch (primaryRole) {
-        case PlatformRole.TEACHER:
+        case SchoolRole.TEACHER:
           return [SchoolRole.TEACHER, SchoolRole.FORM_TEACHER, SchoolRole.DEPARTMENT_HEAD, SchoolRole.ACADEMIC_HEAD];
-        case PlatformRole.PARENT:
+        case SchoolRole.PARENT:
           return [SchoolRole.PARENT];
-        case PlatformRole.STUDENT:
+        case SchoolRole.STUDENT:
           return [SchoolRole.STUDENT];
-        case PlatformRole.STAFF:
+        case SchoolRole.SUPPORT_STAFF:
           return [SchoolRole.REGISTRAR, SchoolRole.BURSAR, SchoolRole.LIBRARIAN, SchoolRole.IT_SUPPORT, SchoolRole.SECURITY];
         default:
           return [SchoolRole.TEACHER];
@@ -462,7 +462,7 @@ const SchoolSpecificStep: React.FC<{ data: OnboardingData; updateData: (data: Pa
             </Select>
           </div>
 
-          {data.primaryRole === PlatformRole.TEACHER && (
+          {data.primaryRole === SchoolRole.TEACHER && (
             <>
               <div>
                 <Label htmlFor="department">Department</Label>
@@ -497,7 +497,7 @@ const SchoolSpecificStep: React.FC<{ data: OnboardingData; updateData: (data: Pa
             </>
           )}
 
-          {data.primaryRole === PlatformRole.STUDENT && (
+          {data.primaryRole === SchoolRole.STUDENT && (
             <>
               <div>
                 <Label htmlFor="studentId">Student ID</Label>
@@ -521,7 +521,7 @@ const SchoolSpecificStep: React.FC<{ data: OnboardingData; updateData: (data: Pa
             </>
           )}
 
-          {data.primaryRole === PlatformRole.STAFF && (
+          {data.primaryRole === SchoolRole.SUPPORT_STAFF && (
             <>
               <div>
                 <Label htmlFor="employeeId">Employee ID</Label>
@@ -800,8 +800,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   onComplete,
   onCancel
 }) => {
-  const { token } = useAuth();
-  
   const [currentStep, setCurrentStep] = useState(0);
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({
     firstName: '',
@@ -809,7 +807,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     email: '',
     invitationType: 'new_user',
     invitationToken,
-    primaryRole: PlatformRole.TEACHER,
+    primaryRole: SchoolRole.TEACHER,
     schoolMemberships: [],
     preferredLanguage: 'en',
     timezone: 'Africa/Harare',
@@ -911,7 +909,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
         },
         body: JSON.stringify(onboardingData),
       });

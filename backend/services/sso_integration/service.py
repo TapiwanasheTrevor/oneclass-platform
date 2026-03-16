@@ -22,7 +22,8 @@ from shared.exceptions import (
     ExternalServiceError
 )
 from shared.models.platform import 
-from shared.models.platform_user import PlatformUserDB as User, School
+from shared.models.platform_user import PlatformUser as User
+from shared.models.platform import School
 from .models import (
     SSOProvider,
     SAMLProvider,

@@ -4,16 +4,15 @@ Database models for platform-level entities (schools, users, configurations)
 """
 from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer, JSON
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 import uuid
 
-Base = declarative_base()
+from shared.database import Base
 
 class School(Base):
     """School model for multi-tenant setup"""
     __tablename__ = "schools"
-    __table_args__ = {"schema": "platform"}
+    __table_args__ = {"schema": "platform", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
@@ -51,7 +50,7 @@ class School(Base):
 class SchoolConfiguration(Base):
     """School-specific configuration and branding"""
     __tablename__ = "school_configurations"
-    __table_args__ = {"schema": "platform"}
+    __table_args__ = {"schema": "platform", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, unique=True, index=True)
@@ -94,7 +93,7 @@ class SchoolConfiguration(Base):
 class SchoolDomain(Base):
     """Custom domains for schools"""
     __tablename__ = "school_domains"
-    __table_args__ = {"schema": "platform"}
+    __table_args__ = {"schema": "platform", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, index=True)
@@ -125,7 +124,7 @@ class SchoolDomain(Base):
 class SchoolFeatureUsage(Base):
     """Track feature usage for analytics and billing"""
     __tablename__ = "school_feature_usage"
-    __table_args__ = {"schema": "platform"}
+    __table_args__ = {"schema": "platform", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, index=True)

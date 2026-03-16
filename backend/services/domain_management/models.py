@@ -357,7 +357,7 @@ class DomainTemplate(Base):
 # Add relationships to existing models
 # This would be added to the existing School model
 from shared.models.platform import School
-from shared.models.platform_user import PlatformUserDB as User
+from shared.models.platform_user import PlatformUser as User
 
 School.domain = relationship("Domain", back_populates="school", uselist=False)
 User.email_addresses = relationship("EmailAddress", back_populates="user")

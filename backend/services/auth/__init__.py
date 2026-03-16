@@ -5,12 +5,14 @@
 # =====================================================
 
 from .routes import router
+from .clerk_webhook import router as clerk_webhook_router
 from .services import AuthService
 from .utils import hash_password, verify_password, create_access_token, verify_token
 from .schemas import LoginRequest, LoginResponse, UserContextResponse
 
 __all__ = [
     "router",
+    "clerk_webhook_router",
     "AuthService", 
     "hash_password",
     "verify_password",

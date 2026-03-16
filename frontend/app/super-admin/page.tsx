@@ -1,3 +1,5 @@
+'use client';
+
 // =====================================================
 // Super Admin Dashboard - Platform Overview
 // File: frontend/app/super-admin/page.tsx

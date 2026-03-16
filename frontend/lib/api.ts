@@ -3,7 +3,7 @@
 // File: frontend/lib/api.ts
 // =====================================================
 
-import axios, { AxiosError, AxiosResponse } from 'axios';
+import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { toast } from 'sonner';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -31,27 +31,53 @@ interface ErrorResponse {
   retry_possible?: boolean;
 }
 
+// --- Clerk token injection ---
+// The auth hook sets this so every API request carries the Clerk session token.
+let _getToken: (() => Promise<string | null>) | null = null;
+let _currentSchoolId: string | null = null;
+
+export function setAuthTokenGetter(fn: (() => Promise<string | null>) | null) {
+  _getToken = fn;
+}
+
+export function setCurrentSchoolId(schoolId: string | null) {
+  _currentSchoolId = schoolId;
+  // Also persist for middleware / SSR fallback
+  if (typeof window !== 'undefined') {
+    if (schoolId) {
+      localStorage.setItem('current_school_id', schoolId);
+    } else {
+      localStorage.removeItem('current_school_id');
+    }
+  }
+}
+
 // Request interceptor to add auth token and school context
 api.interceptors.request.use(
-  (config) => {
-    // Add auth token
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+  async (config: InternalAxiosRequestConfig) => {
+    // Get token from Clerk (async) or fall back to localStorage for dev/SSR
+    let token: string | null = null;
+    if (_getToken) {
+      token = await _getToken();
+    }
+    if (!token && typeof window !== 'undefined') {
+      token = localStorage.getItem('auth_token');
+    }
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    // Add school context if available
-    const currentSchoolId = typeof window !== 'undefined' 
-      ? localStorage.getItem('current_school_id') 
-      : null;
-    if (currentSchoolId) {
-      config.headers['X-School-ID'] = currentSchoolId;
+
+    // Add school context
+    const schoolId = _currentSchoolId
+      || (typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null);
+    if (schoolId) {
+      config.headers['X-School-ID'] = schoolId;
     }
-    
+
     // Add correlation ID for tracking
     const correlationId = `web-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     config.headers['X-Correlation-ID'] = correlationId;
-    
+
     return config;
   },
   (error) => {
@@ -88,11 +114,10 @@ api.interceptors.response.use(
     // Handle authentication errors
     if (status === 401) {
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('current_school_id');
-        
-        // Only redirect if not already on login page
-        if (!window.location.pathname.includes('/login')) {
+        // Only redirect if Clerk is not managing auth (legacy fallback)
+        if (!_getToken && !window.location.pathname.includes('/login')) {
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('current_school_id');
           toast.error('Your session has expired. Please log in again.');
           window.location.href = '/login';
         }
@@ -341,9 +366,7 @@ export const apiHelpers = {
   
   // Switch school context
   switchSchool: (schoolId: string) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('current_school_id', schoolId);
-    }
+    setCurrentSchoolId(schoolId);
     return Promise.resolve();
   },
   

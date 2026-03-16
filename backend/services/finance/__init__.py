@@ -4,12 +4,12 @@
 __version__ = "1.0.0"
 __description__ = "Finance & Billing module with Zimbabwe-specific payment processing"
 
-from .main import app as finance_app
-from .schemas import *
-from .crud import *
-from .paynow_integration import PaynowIntegration
+# Note: Imports are lazy to avoid circular dependency when the main app
+# registers individual route modules. The standalone sub-app is only
+# needed when running Finance as its own microservice.
 
-__all__ = [
-    "finance_app",
-    "PaynowIntegration"
-]
+
+def get_finance_app():
+    """Get the standalone Finance FastAPI sub-app (lazy import)."""
+    from .main import app
+    return app

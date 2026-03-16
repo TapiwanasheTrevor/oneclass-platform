@@ -1,14 +1,17 @@
 // =====================================================
-// School Context Hook for Frontend Multitenancy
-// Implements multitenancy enhancement plan requirements
+// School Configuration Hook
+// Fetches school-level config (branding, features, limits)
+// for the user's currently-active school.
 // File: frontend/hooks/useSchoolContext.ts
 // =====================================================
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from './useAuth';
 import { api } from '@/lib/api';
 
-interface SchoolConfiguration {
+// ---- Interfaces ----
+
+export interface SchoolConfiguration {
   school_id: string;
   logo_url?: string;
   primary_color: string;
@@ -33,19 +36,13 @@ interface SchoolConfiguration {
   terms_per_year: number;
 }
 
-interface SchoolDomain {
-  domain: string;
-  is_primary: boolean;
-  is_custom: boolean;
-}
-
-interface SchoolContext {
+export interface SchoolContextData {
   school: {
     id: string;
     name: string;
+    subdomain: string;
     type: string;
     config: SchoolConfiguration;
-    domains: SchoolDomain[];
   };
   branding: {
     logo_url?: string;
@@ -83,128 +80,136 @@ interface SchoolContext {
   getGradeDisplay: (grade: number) => string;
 }
 
-export function useSchoolContext(): SchoolContext | null {
-  const { user } = useAuth();
-  
-  const { data: schoolData } = useQuery({
-    queryKey: ['school-context', user?.school_id],
+// ---- Main Hook ----
+
+export function useSchoolConfig(): {
+  school: SchoolContextData | null;
+  isLoading: boolean;
+} {
+  const { currentSchool, hasPermission } = useAuth();
+  const schoolId = currentSchool?.school_id;
+
+  const { data: schoolData, isLoading } = useQuery({
+    queryKey: ['school-config', schoolId],
     queryFn: async () => {
-      if (!user?.school_id) return null;
-      
-      const response = await api.get(`/schools/${user.school_id}/context`);
+      if (!schoolId) return null;
+      const response = await api.get(`/api/v1/schools/${schoolId}/context`);
       return response.data;
     },
-    enabled: !!user?.school_id,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 30 * 60 * 1000, // 30 minutes
+    enabled: !!schoolId,
+    staleTime: 5 * 60 * 1000,
   });
 
-  if (!schoolData || !user) return null;
+  if (!schoolData || !currentSchool) {
+    return { school: null, isLoading };
+  }
 
-  return {
+  const config: SchoolConfiguration = schoolData.config || schoolData;
+
+  const contextData: SchoolContextData = {
     school: {
-      id: schoolData.id,
-      name: schoolData.name,
-      type: schoolData.type,
-      config: schoolData.config,
-      domains: schoolData.domains
+      id: schoolData.id || schoolId,
+      name: schoolData.name || currentSchool.school_name,
+      subdomain: schoolData.subdomain || currentSchool.school_subdomain,
+      type: schoolData.type || 'secondary',
+      config,
     },
     branding: {
-      logo_url: schoolData.config.logo_url,
-      primary_color: schoolData.config.primary_color,
-      secondary_color: schoolData.config.secondary_color,
-      accent_color: schoolData.config.accent_color,
-      font_family: schoolData.config.font_family
+      logo_url: config.logo_url,
+      primary_color: config.primary_color || '#1a56db',
+      secondary_color: config.secondary_color || '#7e3af2',
+      accent_color: config.accent_color || '#0e9f6e',
+      font_family: config.font_family || 'Inter',
     },
-    features: schoolData.config.features_enabled,
+    features: config.features_enabled || {},
     subscription: {
-      tier: schoolData.config.subscription_tier,
+      tier: config.subscription_tier || 'basic',
       limits: {
-        max_students: schoolData.config.max_students,
-        max_staff: 50, // This would come from config
-        storage_limit_gb: 10 // This would come from config
-      }
+        max_students: config.max_students || 500,
+        max_staff: 50,
+        storage_limit_gb: 10,
+      },
     },
     academic: {
-      year_start_month: schoolData.config.academic_year_start_month,
-      terms_per_year: schoolData.config.terms_per_year,
-      grading_system: schoolData.config.grading_system
+      year_start_month: config.academic_year_start_month || 1,
+      terms_per_year: config.terms_per_year || 3,
+      grading_system: config.grading_system || {},
     },
     regional: {
-      timezone: schoolData.config.timezone,
-      currency: schoolData.config.currency,
-      date_format: schoolData.config.date_format,
-      primary_language: schoolData.config.language_primary,
-      secondary_language: schoolData.config.language_secondary
+      timezone: config.timezone || 'Africa/Harare',
+      currency: config.currency || 'USD',
+      date_format: config.date_format || 'DD/MM/YYYY',
+      primary_language: config.language_primary || 'en',
+      secondary_language: config.language_secondary,
     },
     hasFeature: (feature: string) => {
-      return schoolData.config.features_enabled[feature] === true &&
-             user.available_features.includes(feature);
+      return (config.features_enabled || {})[feature] === true;
     },
     canAccess: (permission: string) => {
-      return user.permissions.includes('*') || user.permissions.includes(permission);
+      return hasPermission(permission);
     },
     formatCurrency: (amount: number) => {
-      const currency = schoolData.config.currency;
       return new Intl.NumberFormat('en-ZW', {
         style: 'currency',
-        currency: currency,
-        minimumFractionDigits: 2
+        currency: config.currency || 'USD',
+        minimumFractionDigits: 2,
       }).format(amount);
     },
     formatDate: (date: Date) => {
-      const format = schoolData.config.date_format;
-      const locale = schoolData.config.language_primary === 'en' ? 'en-ZW' : 'en-US';
-      
-      if (format === 'DD/MM/YYYY') {
+      const locale = (config.language_primary || 'en') === 'en' ? 'en-ZW' : 'en-US';
+      if ((config.date_format || 'DD/MM/YYYY') === 'DD/MM/YYYY') {
         return date.toLocaleDateString(locale, {
           day: '2-digit',
           month: '2-digit',
-          year: 'numeric'
+          year: 'numeric',
         });
       }
-      
       return date.toLocaleDateString(locale);
     },
     getGradeDisplay: (grade: number) => {
       if (grade <= 7) return `Grade ${grade}`;
-      if (grade === 12) return `Form 5 (Lower 6)`;
-      if (grade === 13) return `Form 6 (Upper 6)`;
+      if (grade === 12) return 'Form 5 (Lower 6)';
+      if (grade === 13) return 'Form 6 (Upper 6)';
       return `Form ${grade - 6}`;
-    }
+    },
   };
+
+  return { school: contextData, isLoading };
 }
 
-// Hook for feature-gated components
+// ---- Backward-compatible default export ----
+// Components importing `useSchoolContext` from this file
+// get the school configuration data.
+export function useSchoolContext(): SchoolContextData | null {
+  const { school } = useSchoolConfig();
+  return school;
+}
+
+// ---- Convenience hooks ----
+
 export function useFeatureAccess(feature: string) {
-  const schoolContext = useSchoolContext();
-  
+  const school = useSchoolContext();
   return {
-    hasAccess: schoolContext?.hasFeature(feature) ?? false,
-    tier: schoolContext?.subscription.tier ?? 'trial',
-    upgradeRequired: !schoolContext?.hasFeature(feature)
+    hasAccess: school?.hasFeature(feature) ?? false,
+    tier: school?.subscription.tier ?? 'trial',
+    upgradeRequired: !school?.hasFeature(feature),
   };
 }
 
-// Hook for permission-gated components
 export function usePermissionAccess(permission: string) {
-  const schoolContext = useSchoolContext();
-  
+  const school = useSchoolContext();
   return {
-    hasAccess: schoolContext?.canAccess(permission) ?? false,
-    userRole: schoolContext?.school ? 'unknown' : 'guest'
+    hasAccess: school?.canAccess(permission) ?? false,
   };
 }
 
-// Hook for subscription limits
 export function useSubscriptionLimits() {
-  const schoolContext = useSchoolContext();
-  
+  const school = useSchoolContext();
   return {
-    maxStudents: schoolContext?.subscription.limits.max_students ?? 0,
-    maxStaff: schoolContext?.subscription.limits.max_staff ?? 0,
-    storageLimit: schoolContext?.subscription.limits.storage_limit_gb ?? 0,
-    tier: schoolContext?.subscription.tier ?? 'trial',
-    canUpgrade: schoolContext?.subscription.tier !== 'enterprise'
+    maxStudents: school?.subscription.limits.max_students ?? 0,
+    maxStaff: school?.subscription.limits.max_staff ?? 0,
+    storageLimit: school?.subscription.limits.storage_limit_gb ?? 0,
+    tier: school?.subscription.tier ?? 'trial',
+    canUpgrade: school?.subscription.tier !== 'enterprise',
   };
 }

@@ -10,6 +10,15 @@ from datetime import datetime, timedelta
 import logging
 
 from shared.auth import get_current_active_user
+get_current_user = get_current_active_user  # alias used throughout this module
+
+
+async def require_admin(current_user=Depends(get_current_active_user)):
+    """Dependency that requires admin-level access."""
+    role = getattr(current_user, 'global_role', None) or (current_user.get('global_role') if isinstance(current_user, dict) else None)
+    if role not in ('super_admin', 'platform_admin'):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
 from shared.models.platform_user import PlatformUser, PlatformRole
 from shared.exceptions import ValidationError, NotFoundError
 from .service import monitoring_service

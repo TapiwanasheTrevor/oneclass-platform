@@ -11,12 +11,12 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import select, insert, update, delete, and_, or_, func, desc, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from ..shared.models.audit_log import (
-    AuditLog, AuditLogSummary, ActionCategory, ActionType, RiskLevel, 
+from shared.models.audit_log import (
+    AuditLog, AuditLogSummary, ActionCategory, ActionType, RiskLevel,
     ComplianceCategory, ActionContext, ActionDetails, SecurityMetadata
 )
-from ..shared.models.unified_user import UnifiedUser, SchoolMembership, SchoolRole
-from ..shared.database import get_async_session
+from shared.models.platform_user import PlatformUser, SchoolMembership, SchoolRole
+from shared.database import get_async_session
 
 import logging
 import json
@@ -592,13 +592,13 @@ class AuditService:
         
         try:
             query = select(
-                UnifiedUser,
+                PlatformUser,
                 SchoolMembership
             ).join(
-                SchoolMembership, UnifiedUser.id == SchoolMembership.user_id
+                SchoolMembership, PlatformUser.id == SchoolMembership.user_id
             ).where(
                 and_(
-                    UnifiedUser.id == user_id,
+                    PlatformUser.id == user_id,
                     SchoolMembership.school_id == school_id,
                     SchoolMembership.status == "active"
                 )

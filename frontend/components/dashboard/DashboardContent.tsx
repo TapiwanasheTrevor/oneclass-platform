@@ -61,15 +61,11 @@ export default function DashboardContent() {
       }
     }
     
-    // Fallback to platform role
-    switch (user?.platform_role) {
-      case 'school_admin':
-      case 'registrar':
+    // Fallback to global role
+    switch (user?.global_role) {
+      case 'super_admin':
+      case 'platform_admin':
         return 'admin';
-      case 'teacher':
-        return 'teacher';
-      case 'parent':
-        return 'parent';
       default:
         return 'student';
     }
@@ -113,7 +109,7 @@ export default function DashboardContent() {
   }
 
   // Check if user is super admin - render super admin dashboard
-  if (isPlatformAdmin && user?.platform_role === 'super_admin') {
+  if (isPlatformAdmin && user?.global_role === 'super_admin') {
     // Super admins still need to see migration care package modal for their school
     if (showMigrationModal && shouldBlockDashboard) {
       return (

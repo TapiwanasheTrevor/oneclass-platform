@@ -15,7 +15,7 @@ import logging
 import os
 
 from shared.database import get_async_session
-from shared.models.platform_user import PlatformUserDB
+from shared.models.platform_user import PlatformUser
 from shared.auth import get_current_active_user
 from .schemas import (
     FileUploadResponse, BulkImportResponse, FileMetadata, FileListResponse,
@@ -39,7 +39,7 @@ async def upload_file(
     school_id: Optional[UUID] = Form(None),
     is_public: bool = Form(False),
     description: Optional[str] = Form(None),
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -102,13 +102,13 @@ async def upload_file(
 
 @router.post("/bulk-import", response_model=BulkImportResponse)
 async def upload_bulk_import(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     school_id: UUID = Form(...),
     import_type: str = Form(...),  # users, students, staff
     dry_run: bool = Form(False),
-    background_tasks: BackgroundTasks,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_async_session)
+    current_user: PlatformUser = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_async_session),
 ):
     """
     Upload file for bulk user import
@@ -186,7 +186,7 @@ async def upload_bulk_import(
 @router.get("/bulk-import/{import_id}/progress", response_model=BulkImportProgress)
 async def get_import_progress(
     import_id: str,
-    current_user: PlatformUserDB = Depends(get_current_active_user)
+    current_user: PlatformUser = Depends(get_current_active_user)
 ):
     """
     Get progress of a bulk import operation
@@ -204,7 +204,7 @@ async def get_import_progress(
 @router.get("/bulk-import/template/{import_type}", response_model=BulkImportTemplate)
 async def get_import_template(
     import_type: str,
-    current_user: PlatformUserDB = Depends(get_current_active_user)
+    current_user: PlatformUser = Depends(get_current_active_user)
 ):
     """
     Get import template for specified type
@@ -221,7 +221,7 @@ async def get_import_template(
 async def resize_image(
     file_id: UUID,
     resize_request: ImageResizeRequest,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -257,7 +257,7 @@ async def download_file(
     thumbnail: bool = False,
     expires: Optional[int] = None,
     signature: Optional[str] = None,
-    current_user: Optional[PlatformUserDB] = Depends(get_current_active_user)
+    current_user: Optional[PlatformUser] = Depends(get_current_active_user)
 ):
     """
     Download a file by ID
@@ -285,7 +285,7 @@ async def download_file(
 @router.get("/storage/quota/{school_id}", response_model=StorageQuotaInfo)
 async def get_storage_quota(
     school_id: UUID,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -306,7 +306,7 @@ async def get_storage_quota(
 async def delete_file(
     file_id: UUID,
     permanent: bool = False,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -334,7 +334,7 @@ async def list_files(
     limit: int = 50,
     offset: int = 0,
     search: Optional[str] = None,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -364,7 +364,7 @@ async def share_file(
     permissions: List[str] = ["view"],
     expires_at: Optional[datetime] = None,
     message: Optional[str] = None,
-    current_user: PlatformUserDB = Depends(get_current_active_user),
+    current_user: PlatformUser = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session)
 ):
     """

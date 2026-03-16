@@ -17,8 +17,8 @@ from pydantic import BaseModel, Field, EmailStr, validator
 
 from shared.database import get_async_session
 from shared.models.platform import School, SchoolSubscription
-from shared.models.unified_user import (
-    UnifiedUser, SchoolMembership, UserSession,
+from shared.models.platform_user import (
+    PlatformUser, SchoolMembership, UserSession,
     GlobalRole, SchoolRole, MembershipStatus, UserStatus
 )
 

@@ -15,7 +15,7 @@ import logging
 from ..academic.models import Subject, Assessment, AttendanceSession
 from ..finance.models import FeeCategory, Invoice, Payment, StudentAccount
 from ..finance.schemas import PaymentStatus, InvoiceStatus
-from core.exceptions import NotFoundError, ValidationError, InsufficientFundsError
+from shared.exceptions import NotFoundError, ValidationError, InsufficientFundsError
 
 logger = logging.getLogger(__name__)
 

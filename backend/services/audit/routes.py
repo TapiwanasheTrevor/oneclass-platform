@@ -12,10 +12,10 @@ from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel, Field
 
 from .audit_service import AuditService, AuditLogRequest, AuditLogFilter, AuditReportRequest
-from ..shared.models.audit_log import ActionCategory, ActionType, RiskLevel, ComplianceCategory
-from ..shared.auth import get_current_user, get_current_school_context
-from ..shared.database import get_async_session
-from ..shared.models.unified_user import UnifiedUser, SchoolRole
+from shared.models.audit_log import ActionCategory, ActionType, RiskLevel, ComplianceCategory
+from shared.auth import get_current_user, get_current_school_context
+from shared.database import get_async_session
+from shared.models.platform_user import PlatformUser, SchoolRole
 
 import logging
 
@@ -92,7 +92,7 @@ router = APIRouter(prefix="/api/v1/audit", tags=["Audit & Compliance"])
 @router.post("/logs", response_model=Dict[str, Any])
 async def create_audit_log(
     request_data: CreateAuditLogRequest,
-    current_user: UnifiedUser = Depends(get_current_user),
+    current_user: PlatformUser = Depends(get_current_user),
     school_context = Depends(get_current_school_context),
     session: AsyncSession = Depends(get_async_session)
 ):
@@ -159,7 +159,7 @@ async def get_audit_logs(
     sort_order: str = Query("desc", regex="^(asc|desc)$", description="Sort order"),
     
     # Dependencies
-    current_user: UnifiedUser = Depends(get_current_user),
+    current_user: PlatformUser = Depends(get_current_user),
     school_context = Depends(get_current_school_context),
     session: AsyncSession = Depends(get_async_session)
 ):
@@ -210,7 +210,7 @@ async def get_audit_logs(
 @router.get("/logs/{log_id}", response_model=Dict[str, Any])
 async def get_audit_log_by_id(
     log_id: str,
-    current_user: UnifiedUser = Depends(get_current_user),
+    current_user: PlatformUser = Depends(get_current_user),
     school_context = Depends(get_current_school_context),
     session: AsyncSession = Depends(get_async_session)
 ):
@@ -253,7 +253,7 @@ async def get_audit_log_by_id(
 async def get_user_activity_summary(
     user_id: str,
     days: int = Query(30, ge=1, le=365, description="Number of days to analyze"),
-    current_user: UnifiedUser = Depends(get_current_user),
+    current_user: PlatformUser = Depends(get_current_user),
     school_context = Depends(get_current_school_context),
     session: AsyncSession = Depends(get_async_session)
 ):
@@ -302,7 +302,7 @@ async def generate_audit_report(
     include_details: bool = Query(False, description="Include detailed activities"),
     include_compliance: bool = Query(True, description="Include compliance information"),
     format: str = Query("json", regex="^(json|csv)$", description="Report format"),
-    current_user: UnifiedUser = Depends(get_current_user),
+    current_user: PlatformUser = Depends(get_current_user),
     school_context = Depends(get_current_school_context),
     session: AsyncSession = Depends(get_async_session)
 ):
@@ -373,7 +373,7 @@ async def generate_audit_report(
 @router.get("/compliance/summary", response_model=Dict[str, Any])
 async def get_compliance_summary(
     days: int = Query(30, ge=1, le=365, description="Number of days to analyze"),
-    current_user: UnifiedUser = Depends(get_current_user),
+    current_user: PlatformUser = Depends(get_current_user),
     school_context = Depends(get_current_school_context),
     session: AsyncSession = Depends(get_async_session)
 ):
@@ -430,7 +430,7 @@ async def get_compliance_summary(
 @router.get("/security/alerts", response_model=Dict[str, Any])
 async def get_security_alerts(
     days: int = Query(7, ge=1, le=30, description="Number of days to analyze"),
-    current_user: UnifiedUser = Depends(get_current_user),
+    current_user: PlatformUser = Depends(get_current_user),
     school_context = Depends(get_current_school_context),
     session: AsyncSession = Depends(get_async_session)
 ):

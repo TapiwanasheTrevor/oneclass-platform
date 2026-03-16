@@ -708,3 +708,54 @@ async def switch_school(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to switch school context",
         )
+
+
+@router.get("/me/schools")
+async def get_my_schools(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_async_session),
+):
+    """
+    Get all schools the current user has access to.
+    Lightweight endpoint for the school switcher — no full user context needed.
+    """
+    try:
+        payload = verify_token(credentials.credentials)
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        memberships_query = select(SchoolMembership).where(
+            and_(
+                SchoolMembership.user_id == user_id,
+                SchoolMembership.status == "active",
+            )
+        )
+        result = await db.execute(memberships_query)
+        memberships = result.scalars().all()
+
+        schools = []
+        for m in memberships:
+            schools.append({
+                "school_id": str(m.school_id),
+                "school_name": m.school_name,
+                "school_subdomain": m.school_subdomain,
+                "role": m.role,
+                "permissions": m.permissions or [],
+                "student_id": m.student_id,
+                "employee_id": m.employee_id,
+                "department": m.department,
+                "current_grade": m.current_grade,
+                "children_ids": [str(c) for c in (m.children_ids or [])],
+            })
+
+        return {"schools": schools, "count": len(schools)}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get schools error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get schools",
+        )

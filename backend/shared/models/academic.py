@@ -4,17 +4,16 @@ Database models for academic-related entities (courses, assessments, grades, tim
 """
 from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer, JSON, ForeignKey, Numeric, Date, Time
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 import uuid
 
-Base = declarative_base()
+from shared.database import Base
 
 class Subject(Base):
     """Subject/Course model"""
     __tablename__ = "subjects"
-    __table_args__ = {"schema": "academic"}
+    __table_args__ = {"schema": "academic", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, index=True)
@@ -51,7 +50,7 @@ class Subject(Base):
 class AcademicYear(Base):
     """Academic year model"""
     __tablename__ = "academic_years"
-    __table_args__ = {"schema": "academic"}
+    __table_args__ = {"schema": "academic", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, index=True)
@@ -76,7 +75,7 @@ class AcademicYear(Base):
 class Term(Base):
     """Academic term/semester model"""
     __tablename__ = "terms"
-    __table_args__ = {"schema": "academic"}
+    __table_args__ = {"schema": "academic", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, index=True)
@@ -105,7 +104,7 @@ class Term(Base):
 class Class(Base):
     """Class/Grade model"""
     __tablename__ = "classes"
-    __table_args__ = {"schema": "academic"}
+    __table_args__ = {"schema": "academic", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, index=True)
@@ -139,7 +138,7 @@ class Class(Base):
 class Assessment(Base):
     """Assessment/Exam model"""
     __tablename__ = "assessments"
-    __table_args__ = {"schema": "academic"}
+    __table_args__ = {"schema": "academic", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, index=True)
@@ -184,7 +183,7 @@ class Assessment(Base):
 class Grade(Base):
     """Student grade/mark model"""
     __tablename__ = "grades"
-    __table_args__ = {"schema": "academic"}
+    __table_args__ = {"schema": "academic", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, index=True)
@@ -219,7 +218,7 @@ class Grade(Base):
 class Timetable(Base):
     """Class timetable model"""
     __tablename__ = "timetables"
-    __table_args__ = {"schema": "academic"}
+    __table_args__ = {"schema": "academic", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, index=True)
@@ -255,7 +254,7 @@ class Timetable(Base):
 class Lesson(Base):
     """Individual lesson model"""
     __tablename__ = "lessons"
-    __table_args__ = {"schema": "academic"}
+    __table_args__ = {"schema": "academic", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, index=True)
@@ -291,7 +290,7 @@ class Lesson(Base):
 class Curriculum(Base):
     """Curriculum standards and requirements"""
     __tablename__ = "curriculum"
-    __table_args__ = {"schema": "academic"}
+    __table_args__ = {"schema": "academic", "extend_existing": True}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id = Column(UUID(as_uuid=True), nullable=False, index=True)

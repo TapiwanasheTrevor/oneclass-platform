@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Staff Dashboard
  * Main dashboard for teachers, registrars, and other staff members

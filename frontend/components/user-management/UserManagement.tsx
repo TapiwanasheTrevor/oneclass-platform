@@ -143,7 +143,7 @@ const statusLabels = {
 };
 
 export const UserManagement: React.FC = () => {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const { currentSchool, availableSchools, switchSchool } = useSchoolContext();
   const { canManageUsers, canViewReports, hasPermission } = usePermissions();
   
@@ -197,11 +197,7 @@ export const UserManagement: React.FC = () => {
         ...(filters.school_id && { school_id: filters.school_id }),
       });
       
-      const response = await fetch(`/api/v1/users?${queryParams}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(`/api/v1/users?${queryParams}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch users');
@@ -254,7 +250,6 @@ export const UserManagement: React.FC = () => {
       const response = await fetch(`/api/v1/users/${userId}`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(updates),
@@ -285,9 +280,6 @@ export const UserManagement: React.FC = () => {
     try {
       const response = await fetch(`/api/v1/users/${userId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
       });
 
       if (!response.ok) {

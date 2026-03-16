@@ -107,9 +107,9 @@ class OptimizedUserService:
 
         # Query database with optimized joins
         query = (
-            select(PlatformUserDB)
-            .options(selectinload(PlatformUserDB.school_memberships))
-            .where(PlatformUserDB.id == user_id)
+            select(PlatformUser)
+            .options(selectinload(PlatformUser.school_memberships))
+            .where(PlatformUser.id == user_id)
         )
 
         result = await self.db.execute(query)
@@ -132,9 +132,9 @@ class OptimizedUserService:
     ) -> Optional[PlatformUser]:
         """Get user by email address"""
         query = (
-            select(PlatformUserDB)
-            .options(selectinload(PlatformUserDB.school_memberships))
-            .where(PlatformUserDB.email == email.lower())
+            select(PlatformUser)
+            .options(selectinload(PlatformUser.school_memberships))
+            .where(PlatformUser.email == email.lower())
         )
 
         result = await self.db.execute(query)
@@ -163,9 +163,9 @@ class OptimizedUserService:
 
         # Query database
         query = (
-            select(PlatformUserDB)
-            .options(selectinload(PlatformUserDB.school_memberships))
-            .where(PlatformUserDB.clerk_integration["clerk_user_id"].astext == clerk_id)
+            select(PlatformUser)
+            .options(selectinload(PlatformUser.school_memberships))
+            .where(PlatformUser.clerk_integration["clerk_user_id"].astext == clerk_id)
         )
 
         result = await self.db.execute(query)
@@ -207,36 +207,36 @@ class OptimizedUserService:
             # Include school membership info
             query = (
                 select(
-                    PlatformUserDB.id,
-                    PlatformUserDB.email,
-                    PlatformUserDB.first_name,
-                    PlatformUserDB.last_name,
-                    PlatformUserDB.platform_role,
-                    PlatformUserDB.status,
-                    SchoolMembershipDB.role.label("school_role"),
-                    SchoolMembershipDB.permissions,
+                    PlatformUser.id,
+                    PlatformUser.email,
+                    PlatformUser.first_name,
+                    PlatformUser.last_name,
+                    PlatformUser.platform_role,
+                    PlatformUser.status,
+                    SchoolMembership.role.label("school_role"),
+                    SchoolMembership.permissions,
                 )
                 .join(
-                    SchoolMembershipDB, PlatformUserDB.id == SchoolMembershipDB.user_id
+                    SchoolMembership, PlatformUser.id == SchoolMembership.user_id
                 )
                 .where(
                     and_(
-                        PlatformUserDB.id == user_id,
-                        SchoolMembershipDB.school_id == school_id,
-                        SchoolMembershipDB.status == UserStatus.ACTIVE.value,
+                        PlatformUser.id == user_id,
+                        SchoolMembership.school_id == school_id,
+                        SchoolMembership.status == UserStatus.ACTIVE.value,
                     )
                 )
             )
         else:
             # Just user data
             query = select(
-                PlatformUserDB.id,
-                PlatformUserDB.email,
-                PlatformUserDB.first_name,
-                PlatformUserDB.last_name,
-                PlatformUserDB.platform_role,
-                PlatformUserDB.status,
-            ).where(PlatformUserDB.id == user_id)
+                PlatformUser.id,
+                PlatformUser.email,
+                PlatformUser.first_name,
+                PlatformUser.last_name,
+                PlatformUser.platform_role,
+                PlatformUser.status,
+            ).where(PlatformUser.id == user_id)
 
         result = await self.db.execute(query)
         row = result.first()
@@ -298,24 +298,24 @@ class OptimizedUserService:
         # Efficient query with specific fields only
         query = (
             select(
-                PlatformUserDB.id,
-                PlatformUserDB.email,
-                PlatformUserDB.first_name,
-                PlatformUserDB.last_name,
-                PlatformUserDB.platform_role,
-                PlatformUserDB.status,
-                SchoolMembershipDB.role,
-                SchoolMembershipDB.joined_date,
-                PlatformUserDB.profile["phone_number"].astext.label("phone_number"),
-                PlatformUserDB.profile["profile_image_url"].astext.label(
+                PlatformUser.id,
+                PlatformUser.email,
+                PlatformUser.first_name,
+                PlatformUser.last_name,
+                PlatformUser.platform_role,
+                PlatformUser.status,
+                SchoolMembership.role,
+                SchoolMembership.joined_date,
+                PlatformUser.profile["phone_number"].astext.label("phone_number"),
+                PlatformUser.profile["profile_image_url"].astext.label(
                     "profile_image_url"
                 ),
             )
-            .join(SchoolMembershipDB, PlatformUserDB.id == SchoolMembershipDB.user_id)
+            .join(SchoolMembership, PlatformUser.id == SchoolMembership.user_id)
             .where(
                 and_(
-                    SchoolMembershipDB.school_id == school_id,
-                    SchoolMembershipDB.status == UserStatus.ACTIVE.value,
+                    SchoolMembership.school_id == school_id,
+                    SchoolMembership.status == UserStatus.ACTIVE.value,
                 )
             )
             .limit(limit)
@@ -324,7 +324,7 @@ class OptimizedUserService:
 
         if roles:
             role_values = [role.value for role in roles]
-            query = query.where(SchoolMembershipDB.role.in_(role_values))
+            query = query.where(SchoolMembership.role.in_(role_values))
 
         result = await self.db.execute(query)
         users = []
@@ -360,15 +360,15 @@ class OptimizedUserService:
         self, school_id: UUID, role: Optional[SchoolRole] = None
     ) -> int:
         """Get count of users in a school, optionally filtered by role"""
-        query = select(func.count(distinct(SchoolMembershipDB.user_id))).where(
+        query = select(func.count(distinct(SchoolMembership.user_id))).where(
             and_(
-                SchoolMembershipDB.school_id == school_id,
-                SchoolMembershipDB.status == UserStatus.ACTIVE.value,
+                SchoolMembership.school_id == school_id,
+                SchoolMembership.status == UserStatus.ACTIVE.value,
             )
         )
 
         if role:
-            query = query.where(SchoolMembershipDB.role == role.value)
+            query = query.where(SchoolMembership.role == role.value)
 
         result = await self.db.execute(query)
         return result.scalar() or 0
@@ -377,10 +377,10 @@ class OptimizedUserService:
 
     async def get_user_schools(self, user_id: UUID) -> List[Dict[str, Any]]:
         """Get all schools a user belongs to"""
-        query = select(SchoolMembershipDB).where(
+        query = select(SchoolMembership).where(
             and_(
-                SchoolMembershipDB.user_id == user_id,
-                SchoolMembershipDB.status == UserStatus.ACTIVE.value,
+                SchoolMembership.user_id == user_id,
+                SchoolMembership.status == UserStatus.ACTIVE.value,
             )
         )
 
@@ -406,11 +406,11 @@ class OptimizedUserService:
         if cached_permissions is not None:
             return len(cached_permissions) > 0
 
-        query = select(SchoolMembershipDB.id).where(
+        query = select(SchoolMembership.id).where(
             and_(
-                SchoolMembershipDB.user_id == user_id,
-                SchoolMembershipDB.school_id == school_id,
-                SchoolMembershipDB.status == UserStatus.ACTIVE.value,
+                SchoolMembership.user_id == user_id,
+                SchoolMembership.school_id == school_id,
+                SchoolMembership.status == UserStatus.ACTIVE.value,
             )
         )
 
@@ -419,11 +419,11 @@ class OptimizedUserService:
 
         # Cache the result
         if has_access:
-            membership_query = select(SchoolMembershipDB.permissions).where(
+            membership_query = select(SchoolMembership.permissions).where(
                 and_(
-                    SchoolMembershipDB.user_id == user_id,
-                    SchoolMembershipDB.school_id == school_id,
-                    SchoolMembershipDB.status == UserStatus.ACTIVE.value,
+                    SchoolMembership.user_id == user_id,
+                    SchoolMembership.school_id == school_id,
+                    SchoolMembership.status == UserStatus.ACTIVE.value,
                 )
             )
             result = await self.db.execute(membership_query)
@@ -448,26 +448,26 @@ class OptimizedUserService:
             # Search within school
             query = (
                 select(
-                    PlatformUserDB.id,
-                    PlatformUserDB.email,
-                    PlatformUserDB.first_name,
-                    PlatformUserDB.last_name,
-                    PlatformUserDB.platform_role,
-                    PlatformUserDB.status,
-                    SchoolMembershipDB.role,
-                    SchoolMembershipDB.joined_date,
+                    PlatformUser.id,
+                    PlatformUser.email,
+                    PlatformUser.first_name,
+                    PlatformUser.last_name,
+                    PlatformUser.platform_role,
+                    PlatformUser.status,
+                    SchoolMembership.role,
+                    SchoolMembership.joined_date,
                 )
                 .join(
-                    SchoolMembershipDB, PlatformUserDB.id == SchoolMembershipDB.user_id
+                    SchoolMembership, PlatformUser.id == SchoolMembership.user_id
                 )
                 .where(
                     and_(
-                        SchoolMembershipDB.school_id == school_id,
-                        SchoolMembershipDB.status == UserStatus.ACTIVE.value,
+                        SchoolMembership.school_id == school_id,
+                        SchoolMembership.status == UserStatus.ACTIVE.value,
                         or_(
-                            func.lower(PlatformUserDB.first_name).like(search_pattern),
-                            func.lower(PlatformUserDB.last_name).like(search_pattern),
-                            func.lower(PlatformUserDB.email).like(search_pattern),
+                            func.lower(PlatformUser.first_name).like(search_pattern),
+                            func.lower(PlatformUser.last_name).like(search_pattern),
+                            func.lower(PlatformUser.email).like(search_pattern),
                         ),
                     )
                 )
@@ -475,24 +475,24 @@ class OptimizedUserService:
 
             if roles:
                 role_values = [role.value for role in roles]
-                query = query.where(SchoolMembershipDB.role.in_(role_values))
+                query = query.where(SchoolMembership.role.in_(role_values))
         else:
             # Search platform-wide
             query = select(
-                PlatformUserDB.id,
-                PlatformUserDB.email,
-                PlatformUserDB.first_name,
-                PlatformUserDB.last_name,
-                PlatformUserDB.platform_role,
-                PlatformUserDB.status,
-                PlatformUserDB.created_at,
+                PlatformUser.id,
+                PlatformUser.email,
+                PlatformUser.first_name,
+                PlatformUser.last_name,
+                PlatformUser.platform_role,
+                PlatformUser.status,
+                PlatformUser.created_at,
             ).where(
                 and_(
-                    PlatformUserDB.status == UserStatus.ACTIVE.value,
+                    PlatformUser.status == UserStatus.ACTIVE.value,
                     or_(
-                        func.lower(PlatformUserDB.first_name).like(search_pattern),
-                        func.lower(PlatformUserDB.last_name).like(search_pattern),
-                        func.lower(PlatformUserDB.email).like(search_pattern),
+                        func.lower(PlatformUser.first_name).like(search_pattern),
+                        func.lower(PlatformUser.last_name).like(search_pattern),
+                        func.lower(PlatformUser.email).like(search_pattern),
                     ),
                 )
             )
@@ -521,7 +521,7 @@ class OptimizedUserService:
 
     # Helper Methods
 
-    async def _convert_db_to_pydantic(self, user_db: PlatformUserDB) -> PlatformUser:
+    async def _convert_db_to_pydantic(self, user_db: PlatformUser) -> PlatformUser:
         """Convert SQLAlchemy model to Pydantic model"""
         # Parse JSON fields
         profile = None

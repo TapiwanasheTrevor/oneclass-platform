@@ -1,16 +1,35 @@
 """
 OneClass Platform Database Models
-Contains all database models organized by functional area
+All models organized by functional area, single Base from shared.database
 """
 
-# Import all models for easy access
+# Platform models
 from .platform import School, SchoolConfiguration, SchoolDomain, SchoolFeatureUsage
+
+# User models (consolidated)
 from .platform_user import (
-    PlatformUser as User,
+    PlatformUser,
+    PlatformUser as User,          # alias
+    PlatformUser as UnifiedUser,   # alias
     SchoolMembership,
     UserInvitation,
+    UserInvitation as SchoolInvitation,  # alias
     UserSession,
+    # Enums
+    GlobalRole,
+    GlobalRole as PlatformRole,    # alias
+    SchoolRole,
+    MembershipStatus,
+    UserStatus,
+    # Pydantic models
+    ContactInformation,
+    PersonalProfile,
+    UserPreferences,
+    ClerkIntegration,
+    UserProfile,
 )
+
+# Academic models
 from .academic import (
     Subject,
     AcademicYear,
@@ -22,6 +41,8 @@ from .academic import (
     Lesson,
     Curriculum,
 )
+
+# Finance models (re-exported from services/finance/models.py where authoritative)
 from .finance import (
     FeeStructure,
     StudentFeeAssignment,
@@ -31,6 +52,8 @@ from .finance import (
     Budget,
     Expense,
 )
+
+# SIS models
 from .sis import (
     Student,
     Enrollment,
@@ -41,38 +64,21 @@ from .sis import (
 )
 
 __all__ = [
-    # Platform models
-    "School",
-    "User",
-    "SchoolConfiguration",
-    "SchoolDomain",
-    "SchoolFeatureUsage",
-    "SchoolMembership",
-    "UserInvitation",
-    "UserSession",
-    # Academic models
-    "Subject",
-    "AcademicYear",
-    "Term",
-    "Class",
-    "Assessment",
-    "Grade",
-    "Timetable",
-    "Lesson",
-    "Curriculum",
-    # Finance models
-    "FeeStructure",
-    "StudentFeeAssignment",
-    "Invoice",
-    "Payment",
-    "FinancialReport",
-    "Budget",
-    "Expense",
-    # SIS models
-    "Student",
-    "Enrollment",
-    "AttendanceRecord",
-    "DisciplinaryRecord",
-    "MedicalRecord",
-    "StudentNote",
+    # Platform
+    "School", "SchoolConfiguration", "SchoolDomain", "SchoolFeatureUsage",
+    # Users
+    "PlatformUser", "User", "UnifiedUser",
+    "SchoolMembership", "UserInvitation", "SchoolInvitation", "UserSession",
+    "GlobalRole", "PlatformRole", "SchoolRole", "MembershipStatus", "UserStatus",
+    "ContactInformation", "PersonalProfile", "UserPreferences",
+    "ClerkIntegration", "UserProfile",
+    # Academic
+    "Subject", "AcademicYear", "Term", "Class", "Assessment",
+    "Grade", "Timetable", "Lesson", "Curriculum",
+    # Finance
+    "FeeStructure", "StudentFeeAssignment", "Invoice", "Payment",
+    "FinancialReport", "Budget", "Expense",
+    # SIS
+    "Student", "Enrollment", "AttendanceRecord",
+    "DisciplinaryRecord", "MedicalRecord", "StudentNote",
 ]

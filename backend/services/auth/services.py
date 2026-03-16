@@ -17,9 +17,10 @@ from shared.models.platform_user import (
     SchoolMembership,
     UserProfile,
     UserStatus,
+    GlobalRole,
+    SchoolRole,
 )
 from shared.models.platform import School
-from shared.models.platform_user import PlatformRole, SchoolRole
 from .schemas import OnboardingCompleteRequest, UserContextResponse
 from .utils import hash_password
 
@@ -36,7 +37,7 @@ class AuthService:
         password: str,
         first_name: str,
         last_name: str,
-        platform_role: PlatformRole = PlatformRole.STUDENT,
+        platform_role: GlobalRole = GlobalRole.SYSTEM_USER,
         **kwargs,
     ) -> PlatformUser:
         """Create a new user account"""
@@ -67,12 +68,10 @@ class AuthService:
             password_hash=password_hash,
             first_name=first_name.strip(),
             last_name=last_name.strip(),
-            platform_role=platform_role,
-            status=UserStatus.ACTIVE,
-            profile=profile,
-            feature_flags=kwargs.get("feature_flags", {}),
+            global_role=platform_role.value if hasattr(platform_role, 'value') else str(platform_role),
+            status=UserStatus.ACTIVE.value,
+            personal_profile=profile.dict() if profile else {},
             user_preferences=kwargs.get("user_preferences", {}),
-            created_at=datetime.utcnow(),
         )
 
         db.add(user)

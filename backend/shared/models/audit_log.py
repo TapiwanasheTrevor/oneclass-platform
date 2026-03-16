@@ -5,7 +5,6 @@ Tracks all user actions within school contexts for compliance and security
 
 from sqlalchemy import Column, String, DateTime, Text, JSON, ForeignKey, Index, Integer
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime, timezone
@@ -15,7 +14,7 @@ import uuid
 import json
 from pydantic import BaseModel, Field
 
-Base = declarative_base()
+from shared.database import Base
 
 # =====================================================
 # AUDIT LOG ENUMS
@@ -218,7 +217,7 @@ class AuditLog(Base):
         Index('idx_audit_logs_compliance', 'compliance_categories'),
         {
             "schema": "platform",
-            "postgresql_with": ["fillfactor=90"],  # Optimize for heavy writes
+            "extend_existing": True,
         }
     )
     
@@ -231,7 +230,7 @@ class AuditLog(Base):
     school_name = Column(String(255), nullable=False)  # Cached for performance
     
     # User identification
-    user_id = Column(PGUUID(as_uuid=True), ForeignKey("platform.unified_users.id"), nullable=False)
+    user_id = Column(PGUUID(as_uuid=True), ForeignKey("platform.users.id"), nullable=False)
     user_email = Column(String(255), nullable=False)  # Cached for reports
     user_full_name = Column(String(200), nullable=False)  # Cached for reports
     user_role = Column(String(50), nullable=False)  # Role at time of action
@@ -270,7 +269,7 @@ class AuditLog(Base):
     archived = Column(String(20), default="active")   # active, archived, purged
     
     # Relationships
-    user = relationship("UnifiedUser", foreign_keys=[user_id])
+    user = relationship("PlatformUser", foreign_keys=[user_id])
     
     # Properties
     @property

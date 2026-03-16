@@ -284,7 +284,7 @@ class StudentFeeAssignmentBase(BaseModel):
                 raise ValueError('Effective to date must be after effective from date')
         return v
     
-    @root_validator
+    @root_validator(skip_on_failure=True)
     def validate_discount(cls, values):
         discount_percentage = values.get('discount_percentage', Decimal('0.00'))
         discount_amount = values.get('discount_amount', Decimal('0.00'))
@@ -360,7 +360,7 @@ class InvoiceLineItemBase(BaseModel):
     discount_percentage: Decimal = Field(default=Decimal('0.00'), decimal_places=2, ge=0, le=100, description="Discount percentage")
     discount_amount: Decimal = Field(default=Decimal('0.00'), decimal_places=2, ge=0, description="Discount amount")
     
-    @root_validator
+    @root_validator(skip_on_failure=True)
     def validate_discount(cls, values):
         discount_percentage = values.get('discount_percentage', Decimal('0.00'))
         discount_amount = values.get('discount_amount', Decimal('0.00'))
@@ -430,7 +430,7 @@ class BulkInvoiceGenerationRequest(BaseModel):
             raise ValueError('Due date cannot be in the past')
         return v
     
-    @root_validator
+    @root_validator(skip_on_failure=True)
     def validate_criteria(cls, values):
         student_ids = values.get('student_ids')
         grade_levels = values.get('grade_levels')
@@ -763,3 +763,75 @@ class FinanceSearchResponse(BaseModel):
     has_next: bool
     has_previous: bool
     results: List[Any]  # This will be typed based on specific search
+
+# =====================================================
+# ZIMBABWE PAYMENT SCHEMAS
+# =====================================================
+
+class EcocashPaymentRequest(BaseModel):
+    """EcoCash mobile money payment request"""
+    student_id: UUID = Field(..., description="Student ID")
+    invoice_ids: List[UUID] = Field(..., min_length=1, description="Invoice IDs to pay")
+    amount: Decimal = Field(..., decimal_places=2, gt=0, description="Total amount")
+    payer_phone: str = Field(..., description="EcoCash phone number")
+    payer_name: Optional[str] = Field(None, description="Payer name")
+
+    @validator('payer_phone')
+    def validate_ecocash_phone(cls, v):
+        import re
+        pattern = r'^(\+263|0)(77|78)[0-9]{7}$'
+        cleaned = v.replace(' ', '').replace('-', '')
+        if not re.match(pattern, cleaned):
+            raise ValueError('Invalid EcoCash phone number (must be 077/078)')
+        return cleaned
+
+class PaymentGatewayResponse(BaseModel):
+    """Generic payment gateway response"""
+    success: bool
+    payment_id: Optional[UUID] = None
+    gateway_reference: Optional[str] = None
+    redirect_url: Optional[str] = None
+    poll_url: Optional[str] = None
+    status: str
+    message: str
+    raw_response: Optional[Dict[str, Any]] = None
+
+class BulkInvoiceCreate(BaseModel):
+    """Bulk invoice creation request"""
+    fee_structure_id: UUID = Field(..., description="Fee structure to invoice")
+    student_ids: List[UUID] = Field(..., min_length=1, description="Student IDs")
+    academic_year: str = Field(..., description="Academic year")
+    term_number: Optional[int] = Field(None, ge=1, le=3, description="Term number")
+    due_date: date = Field(..., description="Payment due date")
+    notes: Optional[str] = None
+
+class BulkInvoiceResult(BaseModel):
+    """Bulk invoice creation result"""
+    total_requested: int
+    total_created: int
+    total_failed: int
+    created_invoice_ids: List[UUID]
+    errors: List[Dict[str, Any]] = []
+
+class FinancialSummary(BaseModel):
+    """Financial summary for dashboards"""
+    total_invoiced: Decimal = Field(default=Decimal('0.00'))
+    total_collected: Decimal = Field(default=Decimal('0.00'))
+    total_outstanding: Decimal = Field(default=Decimal('0.00'))
+    total_overdue: Decimal = Field(default=Decimal('0.00'))
+    collection_rate: Decimal = Field(default=Decimal('0.00'))
+    total_students: int = 0
+    students_fully_paid: int = 0
+    students_with_outstanding: int = 0
+
+class FinancialReport(BaseModel):
+    """Financial report response"""
+    report_id: Optional[UUID] = None
+    report_type: str
+    period_start: date
+    period_end: date
+    summary: FinancialSummary
+    category_breakdown: List[Dict[str, Any]] = []
+    payment_method_breakdown: List[Dict[str, Any]] = []
+    grade_level_breakdown: List[Dict[str, Any]] = []
+    generated_at: datetime = Field(default_factory=datetime.utcnow)

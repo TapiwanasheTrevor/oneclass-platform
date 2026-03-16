@@ -147,9 +147,11 @@ except ImportError as e:
 # Include Authentication module
 try:
     from services.auth import router as auth_router
+    from services.auth.clerk_webhook import router as clerk_webhook_router
 
     # Include auth routes
     app.include_router(auth_router, prefix="/api/v1")
+    app.include_router(clerk_webhook_router, prefix="/api/v1")
 
     logger.info("Authentication module loaded successfully")
 
@@ -397,6 +399,121 @@ except ImportError as e:
             "error": "Module not loaded",
             "timestamp": datetime.utcnow().isoformat(),
         }
+
+
+# Include Finance & Billing module
+try:
+    from services.finance.routes.fee_management import router as fee_management_router
+    from services.finance.routes.invoices import router as invoices_router
+    from services.finance.routes.payments import router as payments_router
+    from services.finance.routes.reports import router as finance_reports_router
+    from services.finance.routes.zimbabwe_finance_api import router as zimbabwe_finance_router
+    from services.finance.routes.academic_finance_api import router as academic_finance_router
+    from services.finance.routes.sis_finance_api import router as sis_finance_router
+
+    # Include all finance sub-routers under /api/v1/finance
+    app.include_router(fee_management_router, prefix="/api/v1/finance")
+    app.include_router(invoices_router, prefix="/api/v1/finance")
+    app.include_router(payments_router, prefix="/api/v1/finance")
+    app.include_router(finance_reports_router, prefix="/api/v1/finance")
+    app.include_router(zimbabwe_finance_router, prefix="/api/v1/finance")
+    app.include_router(academic_finance_router, prefix="/api/v1/finance")
+    app.include_router(sis_finance_router, prefix="/api/v1/finance")
+
+    @app.get("/api/v1/finance/health")
+    async def finance_health():
+        """Finance module health check"""
+        return {
+            "status": "healthy",
+            "service": "finance",
+            "version": "1.0.0",
+            "timestamp": datetime.utcnow().isoformat(),
+            "module": "Finance & Billing",
+            "features": [
+                "fee_management",
+                "invoicing",
+                "payment_processing",
+                "financial_reports",
+                "zimbabwe_payments",
+                "academic_finance_integration",
+                "sis_finance_integration",
+            ],
+        }
+
+    logger.info("Finance & Billing module loaded successfully")
+
+except ImportError as e:
+    logger.warning(f"Finance module not available: {e}")
+
+    @app.get("/api/v1/finance/health")
+    async def finance_health_fallback():
+        """Finance module health check fallback"""
+        return {
+            "status": "unavailable",
+            "service": "finance",
+            "error": "Module not loaded",
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+
+# Include Audit & Compliance module
+try:
+    from services.audit.routes import router as audit_router
+
+    app.include_router(audit_router)
+
+    logger.info("Audit & Compliance module loaded successfully")
+
+except ImportError as e:
+    logger.warning(f"Audit module not available: {e}")
+
+
+# Include Notifications module
+try:
+    from services.notifications.routes import router as notifications_router
+
+    app.include_router(notifications_router)
+
+    logger.info("Notifications module loaded successfully")
+
+except ImportError as e:
+    logger.warning(f"Notifications module not available: {e}")
+
+
+# Include Files module
+try:
+    from services.files.routes import router as files_router
+
+    app.include_router(files_router)
+
+    logger.info("Files module loaded successfully")
+
+except ImportError as e:
+    logger.warning(f"Files module not available: {e}")
+
+
+# Include Invitations module
+try:
+    from services.invitations.routes import router as invitations_router
+
+    app.include_router(invitations_router)
+
+    logger.info("Invitations module loaded successfully")
+
+except ImportError as e:
+    logger.warning(f"Invitations module not available: {e}")
+
+
+# Include Monitoring module
+try:
+    from services.monitoring.routes import router as monitoring_router
+
+    app.include_router(monitoring_router)
+
+    logger.info("Monitoring module loaded successfully")
+
+except ImportError as e:
+    logger.warning(f"Monitoring module not available: {e}")
 
 
 # Error handlers

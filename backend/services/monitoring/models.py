@@ -38,7 +38,7 @@ class SystemHealth(Base):
     status = Column(String(20), nullable=False)  # healthy, unhealthy, degraded
     response_time = Column(Float, nullable=True)  # Response time in milliseconds
     error_message = Column(Text, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    health_metadata = Column("metadata", JSON, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     
     def __repr__(self):

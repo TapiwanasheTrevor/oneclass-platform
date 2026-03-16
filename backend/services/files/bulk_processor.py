@@ -472,14 +472,14 @@ class BulkImportProcessor:
 
     async def _create_user_from_import(
         self, db: AsyncSession, user_data: Dict[str, Any], school_id: uuid.UUID
-    ) -> Optional[PlatformUserDB]:
+    ) -> Optional[PlatformUser]:
         """Create user from import data"""
 
         # Check if user already exists
         from sqlalchemy import select
 
-        existing_query = select(PlatformUserDB).where(
-            PlatformUserDB.email == user_data["email"].lower()
+        existing_query = select(PlatformUser).where(
+            PlatformUser.email == user_data["email"].lower()
         )
         result = await db.execute(existing_query)
         existing_user = result.scalar_one_or_none()
@@ -512,16 +512,15 @@ class BulkImportProcessor:
             "emergency_contact_phone": user_data.get("parent_phone"),
         }
 
-        user = PlatformUserDB(
+        user = PlatformUser(
             id=uuid.uuid4(),
             email=user_data["email"].lower(),
             first_name=user_data["first_name"],
             last_name=user_data["last_name"],
-            platform_role=user_data.get("platform_role", PlatformRole.STUDENT.value),
+            global_role=user_data.get("platform_role", "system_user"),
             status="active",
             primary_school_id=school_id,
-            profile=profile_data,
-            created_at=datetime.utcnow(),
+            personal_profile=profile_data if isinstance(profile_data, dict) else {},
         )
 
         db.add(user)

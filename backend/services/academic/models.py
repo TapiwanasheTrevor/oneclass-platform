@@ -48,7 +48,7 @@ class Subject(Base, AuditMixin, SoftDeleteMixin):
         Index('idx_subjects_school_active', 'school_id', 'is_active'),
         Index('idx_subjects_code', 'code'),
         Index('idx_subjects_grade_levels', 'grade_levels', postgresql_using='gin'),
-        {'schema': 'academic'}
+        {'schema': 'academic', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -97,7 +97,7 @@ class Curriculum(Base, AuditMixin, SoftDeleteMixin):
         Index('idx_curricula_school_year', 'school_id', 'academic_year_id'),
         Index('idx_curricula_subject_grade', 'subject_id', 'grade_level'),
         Index('idx_curricula_term', 'term_number'),
-        {'schema': 'academic'}
+        {'schema': 'academic', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -142,7 +142,7 @@ class Period(Base, AuditMixin, SoftDeleteMixin):
         CheckConstraint('break_type IS NULL OR break_type IN (\'tea\', \'lunch\', \'assembly\')', name='valid_break_type'),
         Index('idx_periods_school_active', 'school_id', 'is_active'),
         Index('idx_periods_time', 'start_time', 'end_time'),
-        {'schema': 'academic'}
+        {'schema': 'academic', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -176,7 +176,7 @@ class Timetable(Base, AuditMixin, SoftDeleteMixin):
         Index('idx_timetables_class', 'class_id'),
         Index('idx_timetables_subject', 'subject_id'),
         Index('idx_timetables_day_period', 'day_of_week', 'period_id'),
-        {'schema': 'academic'}
+        {'schema': 'academic', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -225,7 +225,7 @@ class AttendanceSession(Base, AuditMixin, SoftDeleteMixin):
         Index('idx_attendance_sessions_timetable', 'timetable_id'),
         Index('idx_attendance_sessions_teacher', 'teacher_id'),
         Index('idx_attendance_sessions_class', 'class_id'),
-        {'schema': 'academic'}
+        {'schema': 'academic', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -272,7 +272,7 @@ class AttendanceRecord(Base, AuditMixin):
         Index('idx_attendance_records_school_session', 'school_id', 'attendance_session_id'),
         Index('idx_attendance_records_student', 'student_id'),
         Index('idx_attendance_records_status', 'attendance_status'),
-        {'schema': 'academic'}
+        {'schema': 'academic', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -319,7 +319,7 @@ class Assessment(Base, AuditMixin, SoftDeleteMixin):
         Index('idx_assessments_teacher', 'teacher_id'),
         Index('idx_assessments_date', 'assessment_date'),
         Index('idx_assessments_term', 'term_number'),
-        {'schema': 'academic'}
+        {'schema': 'academic', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -370,7 +370,7 @@ class Grade(Base, AuditMixin):
         Index('idx_grades_student', 'student_id'),
         Index('idx_grades_graded_by', 'graded_by'),
         Index('idx_grades_letter_grade', 'letter_grade'),
-        {'schema': 'academic'}
+        {'schema': 'academic', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -419,7 +419,7 @@ class LessonPlan(Base, AuditMixin, SoftDeleteMixin):
         Index('idx_lesson_plans_teacher', 'teacher_id'),
         Index('idx_lesson_plans_date', 'lesson_date'),
         Index('idx_lesson_plans_term', 'term_number'),
-        {'schema': 'academic'}
+        {'schema': 'academic', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -482,7 +482,7 @@ class CalendarEvent(Base, AuditMixin, SoftDeleteMixin):
         Index('idx_calendar_events_date', 'start_date', 'end_date'),
         Index('idx_calendar_events_type', 'event_type'),
         Index('idx_calendar_events_term', 'term_number'),
-        {'schema': 'academic'}
+        {'schema': 'academic', 'extend_existing': True}
     )
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)

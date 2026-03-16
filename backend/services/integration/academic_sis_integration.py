@@ -15,8 +15,15 @@ from ..academic.models import Subject, Assessment, Grade, AttendanceSession, Att
 from ..academic.schemas import StudentPerformance, AttendanceStats
 from ..sis.models import Student, Class, Enrollment, Guardian
 from ..sis.schemas import StudentWithDetails, ClassWithStudents
-from core.exceptions import NotFoundError, ValidationError
-from core.utils import calculate_age
+from shared.exceptions import NotFoundError, ValidationError
+
+
+def calculate_age(date_of_birth: date) -> int:
+    """Calculate age from date of birth."""
+    today = date.today()
+    return today.year - date_of_birth.year - (
+        (today.month, today.day) < (date_of_birth.month, date_of_birth.day)
+    )
 
 logger = logging.getLogger(__name__)
 

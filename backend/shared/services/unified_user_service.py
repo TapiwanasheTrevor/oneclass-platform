@@ -16,8 +16,8 @@ from sqlalchemy.orm import selectinload, joinedload
 from pydantic import BaseModel, Field, EmailStr, validator
 
 from shared.database import get_async_session
-from shared.models.unified_user import (
-    UnifiedUser, SchoolMembership, UserSession, SchoolInvitation,
+from shared.models.platform_user import (
+    PlatformUser, SchoolMembership, UserSession, UserInvitation as SchoolInvitation,
     GlobalRole, SchoolRole, MembershipStatus, UserStatus,
     ContactInformation, PersonalProfile, UserPreferences
 )
@@ -123,7 +123,7 @@ class UnifiedUserService:
     # USER MANAGEMENT
     # =====================================================
     
-    async def create_user(self, user_data: UserCreate) -> UnifiedUser:
+    async def create_user(self, user_data: UserCreate) -> PlatformUser:
         """Create a new unified user"""
         
         try:
@@ -133,7 +133,7 @@ class UnifiedUserService:
                 raise ValueError(f"User with email {user_data.email} already exists")
             
             # Create user
-            user = UnifiedUser(
+            user = PlatformUser(
                 email=user_data.email,
                 first_name=user_data.first_name,
                 last_name=user_data.last_name,
@@ -165,14 +165,14 @@ class UnifiedUserService:
             logger.error(f"Error creating user: {e}")
             raise
     
-    async def get_user_by_id(self, user_id: UUID) -> Optional[UnifiedUser]:
+    async def get_user_by_id(self, user_id: UUID) -> Optional[PlatformUser]:
         """Get user by ID with school memberships"""
         
         try:
             result = await self.db.execute(
-                select(UnifiedUser)
-                .options(selectinload(UnifiedUser.school_memberships))
-                .where(UnifiedUser.id == user_id)
+                select(PlatformUser)
+                .options(selectinload(PlatformUser.school_memberships))
+                .where(PlatformUser.id == user_id)
             )
             return result.scalar_one_or_none()
             
@@ -180,14 +180,14 @@ class UnifiedUserService:
             logger.error(f"Error getting user by ID {user_id}: {e}")
             return None
     
-    async def get_user_by_email(self, email: str) -> Optional[UnifiedUser]:
+    async def get_user_by_email(self, email: str) -> Optional[PlatformUser]:
         """Get user by email with school memberships"""
         
         try:
             result = await self.db.execute(
-                select(UnifiedUser)
-                .options(selectinload(UnifiedUser.school_memberships))
-                .where(UnifiedUser.email == email.lower().strip())
+                select(PlatformUser)
+                .options(selectinload(PlatformUser.school_memberships))
+                .where(PlatformUser.email == email.lower().strip())
             )
             return result.scalar_one_or_none()
             
@@ -199,7 +199,7 @@ class UnifiedUserService:
         self, 
         user_id: UUID, 
         profile_data: Dict[str, Any]
-    ) -> Optional[UnifiedUser]:
+    ) -> Optional[PlatformUser]:
         """Update user profile information"""
         
         try:
@@ -598,10 +598,10 @@ class UnifiedUserService:
     # UTILITY METHODS
     # =====================================================
     
-    async def _get_user_by_email(self, email: str) -> Optional[UnifiedUser]:
+    async def _get_user_by_email(self, email: str) -> Optional[PlatformUser]:
         """Internal method to get user by email"""
         result = await self.db.execute(
-            select(UnifiedUser).where(UnifiedUser.email == email.lower().strip())
+            select(PlatformUser).where(PlatformUser.email == email.lower().strip())
         )
         return result.scalar_one_or_none()
     

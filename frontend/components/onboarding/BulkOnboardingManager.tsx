@@ -23,7 +23,7 @@ import {
 import { toast } from 'sonner';
 import { useDropzone } from 'react-dropzone';
 
-import { useAuth, usePermissions, PlatformRole, SchoolRole } from '@/hooks/useAuth';
+import { usePermissions, SchoolRole } from '@/hooks/useAuth';
 
 interface BulkUser {
   row: number;
@@ -31,7 +31,7 @@ interface BulkUser {
   firstName: string;
   lastName: string;
   phone?: string;
-  platformRole: PlatformRole;
+  platformRole: SchoolRole;
   schoolRole: SchoolRole;
   department?: string;
   employeeId?: string;
@@ -62,7 +62,6 @@ interface BulkImportJob {
 }
 
 export const BulkOnboardingManager: React.FC = () => {
-  const { token } = useAuth();
   const { canManageUsers, isPlatformAdmin, isSchoolAdmin } = usePermissions();
   
   const [activeTab, setActiveTab] = useState('upload');
@@ -89,9 +88,6 @@ export const BulkOnboardingManager: React.FC = () => {
 
       const response = await fetch('/api/v1/bulk-import/preview', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
         body: formData,
       });
 
@@ -119,7 +115,7 @@ export const BulkOnboardingManager: React.FC = () => {
     } finally {
       setProcessing(false);
     }
-  }, [token]);
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -138,7 +134,6 @@ export const BulkOnboardingManager: React.FC = () => {
       const response = await fetch('/api/v1/bulk-import/process', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ users }),
@@ -169,11 +164,7 @@ export const BulkOnboardingManager: React.FC = () => {
   const pollJobProgress = async (jobId: string) => {
     const poll = async () => {
       try {
-        const response = await fetch(`/api/v1/bulk-import/jobs/${jobId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
+        const response = await fetch(`/api/v1/bulk-import/jobs/${jobId}`);
 
         if (response.ok) {
           const job = await response.json();
@@ -206,11 +197,7 @@ export const BulkOnboardingManager: React.FC = () => {
   // Fetch import history
   const fetchImportHistory = async () => {
     try {
-      const response = await fetch('/api/v1/bulk-import/jobs', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await fetch('/api/v1/bulk-import/jobs');
 
       if (response.ok) {
         const jobs = await response.json();
