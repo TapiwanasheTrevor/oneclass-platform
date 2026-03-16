@@ -6,11 +6,13 @@
 # Dependencies
 node_modules/
 .venv/
+venv/
 __pycache__/
 
 # Build outputs
 dist/
 build/
+.next/
 *.pyc
 
 # IDE
@@ -20,6 +22,9 @@ build/
 !.vscode/launch.json
 !.vscode/extensions.json
 .idea/
+
+# Claude Code
+.claude/settings.local.json
 
 # OS
 .DS_Store
