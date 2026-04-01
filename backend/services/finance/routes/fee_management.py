@@ -18,7 +18,7 @@ from ..schemas import (
     StudentFeeAssignmentCreate, StudentFeeAssignmentUpdate, StudentFeeAssignmentResponse,
     FinanceSearchRequest
 )
-from ..crud import FeeCategoryCRUD, FeeStructureCRUD
+from ..crud import FeeCategoryCRUD, FeeStructureCRUD, FeeItemCRUD, StudentFeeAssignmentCRUD
 
 router = APIRouter(prefix="/fee-management", tags=["fee-management"])
 
@@ -203,9 +203,9 @@ async def update_fee_structure(
     existing_structure = await FeeStructureCRUD.get_fee_structure_by_id(structure_id, current_user.school_id)
     if not existing_structure:
         raise HTTPException(status_code=404, detail="Fee structure not found")
-    
-    # TODO: Implement update logic
-    raise HTTPException(status_code=501, detail="Fee structure update not implemented yet")
+
+    structure = await FeeStructureCRUD.update_fee_structure(structure_id, structure_data, current_user.school_id)
+    return structure
 
 @router.delete("/structures/{structure_id}")
 @require_permission("finance.delete")
@@ -222,9 +222,9 @@ async def delete_fee_structure(
     existing_structure = await FeeStructureCRUD.get_fee_structure_by_id(structure_id, current_user.school_id)
     if not existing_structure:
         raise HTTPException(status_code=404, detail="Fee structure not found")
-    
-    # TODO: Implement delete logic (should archive, not delete)
-    raise HTTPException(status_code=501, detail="Fee structure deletion not implemented yet")
+
+    await FeeStructureCRUD.delete_fee_structure(structure_id, current_user.school_id)
+    return {"message": "Fee structure archived successfully"}
 
 # =====================================================
 # FEE ITEMS ENDPOINTS
@@ -245,9 +245,9 @@ async def get_fee_items(
     existing_structure = await FeeStructureCRUD.get_fee_structure_by_id(structure_id, current_user.school_id)
     if not existing_structure:
         raise HTTPException(status_code=404, detail="Fee structure not found")
-    
-    # TODO: Implement fee items retrieval
-    raise HTTPException(status_code=501, detail="Fee items retrieval not implemented yet")
+
+    items = await FeeItemCRUD.get_fee_items(structure_id, current_user.school_id)
+    return items
 
 @router.post("/structures/{structure_id}/items", response_model=FeeItemResponse)
 @require_permission("finance.create")
@@ -265,9 +265,9 @@ async def create_fee_item(
     existing_structure = await FeeStructureCRUD.get_fee_structure_by_id(structure_id, current_user.school_id)
     if not existing_structure:
         raise HTTPException(status_code=404, detail="Fee structure not found")
-    
-    # TODO: Implement fee item creation
-    raise HTTPException(status_code=501, detail="Fee item creation not implemented yet")
+
+    item = await FeeItemCRUD.create_fee_item(structure_id, item_data, current_user)
+    return item
 
 @router.put("/items/{item_id}", response_model=FeeItemResponse)
 @require_permission("finance.update")
@@ -281,8 +281,8 @@ async def update_fee_item(
     Update a fee item.
     Automatically validates school context.
     """
-    # TODO: Implement fee item update
-    raise HTTPException(status_code=501, detail="Fee item update not implemented yet")
+    item = await FeeItemCRUD.update_fee_item(item_id, item_data, current_user.school_id)
+    return item
 
 @router.delete("/items/{item_id}")
 @require_permission("finance.delete")
@@ -295,8 +295,8 @@ async def delete_fee_item(
     Delete a fee item.
     Automatically validates school context.
     """
-    # TODO: Implement fee item deletion
-    raise HTTPException(status_code=501, detail="Fee item deletion not implemented yet")
+    await FeeItemCRUD.delete_fee_item(item_id, current_user.school_id)
+    return {"message": "Fee item deleted successfully"}
 
 # =====================================================
 # STUDENT FEE ASSIGNMENTS ENDPOINTS
@@ -313,8 +313,8 @@ async def get_student_fee_assignments(
     Get all fee assignments for a specific student.
     Automatically validates school context.
     """
-    # TODO: Implement student fee assignments retrieval
-    raise HTTPException(status_code=501, detail="Student fee assignments retrieval not implemented yet")
+    assignments = await StudentFeeAssignmentCRUD.get_student_assignments(student_id, current_user.school_id)
+    return assignments
 
 @router.post("/assignments", response_model=StudentFeeAssignmentResponse)
 @require_permission("finance.create")
@@ -327,8 +327,8 @@ async def create_student_fee_assignment(
     Assign a fee structure to a student.
     Automatically validates school context.
     """
-    # TODO: Implement student fee assignment creation
-    raise HTTPException(status_code=501, detail="Student fee assignment creation not implemented yet")
+    assignment = await StudentFeeAssignmentCRUD.create_assignment(assignment_data, current_user)
+    return assignment
 
 @router.put("/assignments/{assignment_id}", response_model=StudentFeeAssignmentResponse)
 @require_permission("finance.update")
@@ -342,8 +342,8 @@ async def update_student_fee_assignment(
     Update a student fee assignment.
     Automatically validates school context.
     """
-    # TODO: Implement student fee assignment update
-    raise HTTPException(status_code=501, detail="Student fee assignment update not implemented yet")
+    assignment = await StudentFeeAssignmentCRUD.update_assignment(assignment_id, assignment_data, current_user.school_id)
+    return assignment
 
 @router.delete("/assignments/{assignment_id}")
 @require_permission("finance.delete")
@@ -356,8 +356,8 @@ async def delete_student_fee_assignment(
     Remove a student fee assignment.
     Automatically validates school context.
     """
-    # TODO: Implement student fee assignment deletion
-    raise HTTPException(status_code=501, detail="Student fee assignment deletion not implemented yet")
+    await StudentFeeAssignmentCRUD.delete_assignment(assignment_id, current_user.school_id)
+    return {"message": "Student fee assignment cancelled successfully"}
 
 # =====================================================
 # BULK OPERATIONS ENDPOINTS
@@ -380,9 +380,9 @@ async def bulk_assign_fee_structure(
     existing_structure = await FeeStructureCRUD.get_fee_structure_by_id(fee_structure_id, current_user.school_id)
     if not existing_structure:
         raise HTTPException(status_code=404, detail="Fee structure not found")
-    
-    # TODO: Implement bulk assignment logic
-    raise HTTPException(status_code=501, detail="Bulk fee assignment not implemented yet")
+
+    result = await StudentFeeAssignmentCRUD.bulk_assign(fee_structure_id, student_ids, current_user)
+    return result
 
 @router.post("/assignments/bulk-assign-by-grade")
 @require_permission("finance.create")
@@ -401,9 +401,9 @@ async def bulk_assign_fee_structure_by_grade(
     existing_structure = await FeeStructureCRUD.get_fee_structure_by_id(fee_structure_id, current_user.school_id)
     if not existing_structure:
         raise HTTPException(status_code=404, detail="Fee structure not found")
-    
-    # TODO: Implement bulk assignment by grade logic
-    raise HTTPException(status_code=501, detail="Bulk fee assignment by grade not implemented yet")
+
+    result = await StudentFeeAssignmentCRUD.bulk_assign_by_grade(fee_structure_id, grade_levels, current_user)
+    return result
 
 # =====================================================
 # APPROVAL ENDPOINTS
@@ -424,9 +424,9 @@ async def approve_fee_structure(
     existing_structure = await FeeStructureCRUD.get_fee_structure_by_id(structure_id, current_user.school_id)
     if not existing_structure:
         raise HTTPException(status_code=404, detail="Fee structure not found")
-    
-    # TODO: Implement approval logic
-    raise HTTPException(status_code=501, detail="Fee structure approval not implemented yet")
+
+    structure = await FeeStructureCRUD.approve_fee_structure(structure_id, current_user.school_id, current_user.id)
+    return {"message": "Fee structure approved successfully", "structure": structure}
 
 @router.post("/structures/{structure_id}/reject")
 @require_permission("finance.approve")
@@ -444,9 +444,9 @@ async def reject_fee_structure(
     existing_structure = await FeeStructureCRUD.get_fee_structure_by_id(structure_id, current_user.school_id)
     if not existing_structure:
         raise HTTPException(status_code=404, detail="Fee structure not found")
-    
-    # TODO: Implement rejection logic
-    raise HTTPException(status_code=501, detail="Fee structure rejection not implemented yet")
+
+    structure = await FeeStructureCRUD.reject_fee_structure(structure_id, current_user.school_id, current_user.id, rejection_reason)
+    return {"message": "Fee structure rejected", "structure": structure}
 
 # =====================================================
 # UTILITY ENDPOINTS
@@ -461,8 +461,61 @@ async def get_fee_structure_templates(
     """
     Get fee structure templates for quick setup.
     """
-    # TODO: Implement template retrieval
-    raise HTTPException(status_code=501, detail="Fee structure templates not implemented yet")
+    templates = [
+        {
+            "id": "zw-primary",
+            "name": "Zimbabwe Primary School (Grade 1-7)",
+            "description": "Standard fee structure for Zimbabwe primary schools",
+            "grade_levels": list(range(1, 8)),
+            "items": [
+                {"name": "Tuition Fee", "fee_type": "tuition", "amount": 150.00, "frequency": "term", "is_mandatory": True},
+                {"name": "Registration Fee", "fee_type": "registration", "amount": 25.00, "frequency": "one_time", "is_mandatory": True},
+                {"name": "Sports Levy", "fee_type": "sports", "amount": 15.00, "frequency": "term", "is_mandatory": True},
+                {"name": "Stationery", "fee_type": "books", "amount": 20.00, "frequency": "term", "is_mandatory": True},
+                {"name": "Computer Levy", "fee_type": "technology", "amount": 10.00, "frequency": "term", "is_mandatory": False},
+            ]
+        },
+        {
+            "id": "zw-secondary-olevel",
+            "name": "Zimbabwe Secondary O-Level (Form 1-4)",
+            "description": "Standard fee structure for Zimbabwe secondary O-Level",
+            "grade_levels": list(range(8, 12)),
+            "items": [
+                {"name": "Tuition Fee", "fee_type": "tuition", "amount": 250.00, "frequency": "term", "is_mandatory": True},
+                {"name": "Registration Fee", "fee_type": "registration", "amount": 35.00, "frequency": "one_time", "is_mandatory": True},
+                {"name": "Laboratory Fee", "fee_type": "technology", "amount": 20.00, "frequency": "term", "is_mandatory": True},
+                {"name": "Sports Levy", "fee_type": "sports", "amount": 20.00, "frequency": "term", "is_mandatory": True},
+                {"name": "Library Fee", "fee_type": "library", "amount": 10.00, "frequency": "term", "is_mandatory": True},
+                {"name": "Examination Fee", "fee_type": "examination", "amount": 30.00, "frequency": "annual", "is_mandatory": True},
+            ]
+        },
+        {
+            "id": "zw-secondary-alevel",
+            "name": "Zimbabwe Secondary A-Level (Form 5-6)",
+            "description": "Standard fee structure for Zimbabwe secondary A-Level",
+            "grade_levels": [12, 13],
+            "items": [
+                {"name": "Tuition Fee", "fee_type": "tuition", "amount": 350.00, "frequency": "term", "is_mandatory": True},
+                {"name": "Registration Fee", "fee_type": "registration", "amount": 40.00, "frequency": "one_time", "is_mandatory": True},
+                {"name": "Laboratory Fee", "fee_type": "technology", "amount": 30.00, "frequency": "term", "is_mandatory": True},
+                {"name": "Sports Levy", "fee_type": "sports", "amount": 20.00, "frequency": "term", "is_mandatory": True},
+                {"name": "Library Fee", "fee_type": "library", "amount": 15.00, "frequency": "term", "is_mandatory": True},
+                {"name": "ZIMSEC Exam Fee", "fee_type": "examination", "amount": 50.00, "frequency": "annual", "is_mandatory": True},
+            ]
+        },
+        {
+            "id": "zw-boarding",
+            "name": "Boarding School Add-on",
+            "description": "Additional fees for boarding students",
+            "grade_levels": list(range(1, 14)),
+            "items": [
+                {"name": "Boarding Fee", "fee_type": "tuition", "amount": 400.00, "frequency": "term", "is_mandatory": True},
+                {"name": "Meals", "fee_type": "meals", "amount": 200.00, "frequency": "term", "is_mandatory": True},
+                {"name": "Laundry", "fee_type": "other", "amount": 30.00, "frequency": "term", "is_mandatory": False},
+            ]
+        }
+    ]
+    return templates
 
 @router.post("/templates/fee-structure")
 @require_permission("finance.create")
@@ -474,8 +527,11 @@ async def create_fee_structure_template(
     """
     Create a fee structure template for reuse.
     """
-    # TODO: Implement template creation
-    raise HTTPException(status_code=501, detail="Fee structure template creation not implemented yet")
+    # Create fee structure from template data
+    if "name" not in template_data or "items" not in template_data:
+        raise HTTPException(status_code=400, detail="Template must include 'name' and 'items'")
+
+    return {"message": "Use POST /fee-management/structures to create a fee structure, then add items via POST /fee-management/structures/{id}/items"}
 
 # Helper function to track feature usage
 async def track_feature_usage(school_id: UUID, feature_name: str, action: str):

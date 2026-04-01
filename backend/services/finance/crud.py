@@ -330,6 +330,599 @@ class FeeStructureCRUD:
             logger.error(f"Error fetching fee structure with items: {e}")
             raise HTTPException(status_code=500, detail="Failed to fetch fee structure details")
 
+    @staticmethod
+    async def update_fee_structure(structure_id: UUID, structure_data: FeeStructureUpdate, school_id: UUID) -> FeeStructureResponse:
+        """Update a fee structure"""
+        try:
+            async with get_database_connection() as conn:
+                update_fields = []
+                params = []
+                param_count = 1
+
+                for field, value in structure_data.dict(exclude_unset=True).items():
+                    if value is not None:
+                        update_fields.append(f"{field} = ${param_count}")
+                        params.append(value)
+                        param_count += 1
+
+                if not update_fields:
+                    raise HTTPException(status_code=400, detail="No fields to update")
+
+                update_fields.append("updated_at = NOW()")
+
+                query = f"""
+                    UPDATE finance.fee_structures
+                    SET {', '.join(update_fields)}
+                    WHERE id = ${param_count} AND school_id = ${param_count + 1}
+                    RETURNING *
+                """
+                params.extend([structure_id, school_id])
+
+                row = await conn.fetchrow(query, *params)
+                if not row:
+                    raise HTTPException(status_code=404, detail="Fee structure not found")
+
+                logger.info(f"Updated fee structure {structure_id}")
+                return FeeStructureResponse(**dict(row))
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error updating fee structure: {e}")
+            raise HTTPException(status_code=500, detail="Failed to update fee structure")
+
+    @staticmethod
+    async def delete_fee_structure(structure_id: UUID, school_id: UUID) -> bool:
+        """Archive a fee structure (soft delete)"""
+        try:
+            async with get_database_connection() as conn:
+                # Check for active assignments
+                active_assignments = await conn.fetchval(
+                    "SELECT COUNT(*) FROM finance.student_fee_assignments WHERE fee_structure_id = $1 AND status = 'active'",
+                    structure_id
+                )
+
+                new_status = 'archived'
+                if active_assignments > 0:
+                    new_status = 'inactive'
+
+                result = await conn.execute(
+                    """
+                    UPDATE finance.fee_structures
+                    SET status = $1, is_active = FALSE, updated_at = NOW()
+                    WHERE id = $2 AND school_id = $3
+                    """,
+                    new_status, structure_id, school_id
+                )
+
+                if result == "UPDATE 0":
+                    raise HTTPException(status_code=404, detail="Fee structure not found")
+
+                logger.info(f"Archived fee structure {structure_id} (status: {new_status})")
+                return True
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error archiving fee structure: {e}")
+            raise HTTPException(status_code=500, detail="Failed to archive fee structure")
+
+    @staticmethod
+    async def approve_fee_structure(structure_id: UUID, school_id: UUID, approved_by: UUID) -> FeeStructureResponse:
+        """Approve a fee structure for use"""
+        try:
+            async with get_database_connection() as conn:
+                row = await conn.fetchrow(
+                    """
+                    UPDATE finance.fee_structures
+                    SET status = 'active', approved_by = $1, approved_at = NOW(), updated_at = NOW()
+                    WHERE id = $2 AND school_id = $3 AND status = 'draft'
+                    RETURNING *
+                    """,
+                    approved_by, structure_id, school_id
+                )
+
+                if not row:
+                    raise HTTPException(status_code=400, detail="Fee structure not found or not in draft status")
+
+                logger.info(f"Approved fee structure {structure_id}")
+                return FeeStructureResponse(**dict(row))
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error approving fee structure: {e}")
+            raise HTTPException(status_code=500, detail="Failed to approve fee structure")
+
+    @staticmethod
+    async def reject_fee_structure(structure_id: UUID, school_id: UUID, rejected_by: UUID, reason: str) -> FeeStructureResponse:
+        """Reject a fee structure"""
+        try:
+            async with get_database_connection() as conn:
+                row = await conn.fetchrow(
+                    """
+                    UPDATE finance.fee_structures
+                    SET status = 'inactive', updated_by = $1, updated_at = NOW(),
+                        description = COALESCE(description, '') || E'\n[Rejected: ' || $2 || ']'
+                    WHERE id = $3 AND school_id = $4 AND status = 'draft'
+                    RETURNING *
+                    """,
+                    str(rejected_by), reason, structure_id, school_id
+                )
+
+                if not row:
+                    raise HTTPException(status_code=400, detail="Fee structure not found or not in draft status")
+
+                logger.info(f"Rejected fee structure {structure_id}: {reason}")
+                return FeeStructureResponse(**dict(row))
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error rejecting fee structure: {e}")
+            raise HTTPException(status_code=500, detail="Failed to reject fee structure")
+
+# =====================================================
+# FEE ITEM CRUD
+# =====================================================
+
+class FeeItemCRUD:
+    """CRUD operations for fee items"""
+
+    @staticmethod
+    async def get_fee_items(structure_id: UUID, school_id: UUID) -> List[FeeItemResponse]:
+        """Get all fee items for a structure"""
+        try:
+            async with get_database_connection() as conn:
+                # Verify structure belongs to school
+                structure_check = await conn.fetchval(
+                    "SELECT id FROM finance.fee_structures WHERE id = $1 AND school_id = $2",
+                    structure_id, school_id
+                )
+                if not structure_check:
+                    raise HTTPException(status_code=404, detail="Fee structure not found")
+
+                rows = await conn.fetch(
+                    """
+                    SELECT fi.*,
+                           json_build_object(
+                               'id', fc.id, 'school_id', fc.school_id, 'name', fc.name,
+                               'description', fc.description, 'code', fc.code,
+                               'is_mandatory', fc.is_mandatory, 'is_refundable', fc.is_refundable,
+                               'allows_partial_payment', fc.allows_partial_payment,
+                               'display_order', fc.display_order, 'is_active', fc.is_active,
+                               'created_by', fc.created_by, 'created_at', fc.created_at,
+                               'updated_at', fc.updated_at
+                           ) as fee_category
+                    FROM finance.fee_items fi
+                    LEFT JOIN finance.fee_categories fc ON fi.fee_category_id = fc.id
+                    WHERE fi.fee_structure_id = $1
+                    ORDER BY fc.display_order, fi.name
+                    """,
+                    structure_id
+                )
+                return [FeeItemResponse(**dict(row)) for row in rows]
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error fetching fee items: {e}")
+            raise HTTPException(status_code=500, detail="Failed to fetch fee items")
+
+    @staticmethod
+    async def create_fee_item(structure_id: UUID, item_data: FeeItemCreate, current_user: EnhancedUser) -> FeeItemResponse:
+        """Create a new fee item within a structure"""
+        try:
+            async with get_database_connection() as conn:
+                # Verify category exists and belongs to school
+                category_check = await conn.fetchval(
+                    "SELECT id FROM finance.fee_categories WHERE id = $1 AND school_id = $2",
+                    item_data.fee_category_id, current_user.school_id
+                )
+                if not category_check:
+                    raise HTTPException(status_code=404, detail="Fee category not found")
+
+                query = """
+                    INSERT INTO finance.fee_items
+                    (fee_structure_id, fee_category_id, name, description, base_amount, currency,
+                     frequency, due_date_offset_days, allows_installments, max_installments,
+                     installment_interval_days, late_fee_amount, late_fee_grace_days,
+                     daily_penalty_rate, created_by)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                    RETURNING *
+                """
+                row = await conn.fetchrow(
+                    query,
+                    structure_id,
+                    item_data.fee_category_id,
+                    item_data.name,
+                    item_data.description,
+                    item_data.base_amount,
+                    item_data.currency,
+                    item_data.frequency,
+                    item_data.due_date_offset_days,
+                    item_data.allows_installments,
+                    item_data.max_installments,
+                    item_data.installment_interval_days,
+                    item_data.late_fee_amount,
+                    item_data.late_fee_grace_days,
+                    item_data.daily_penalty_rate,
+                    current_user.id
+                )
+
+                logger.info(f"Created fee item {item_data.name} in structure {structure_id}")
+                return FeeItemResponse(**dict(row))
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error creating fee item: {e}")
+            raise HTTPException(status_code=500, detail="Failed to create fee item")
+
+    @staticmethod
+    async def update_fee_item(item_id: UUID, item_data: FeeItemUpdate, school_id: UUID) -> FeeItemResponse:
+        """Update a fee item"""
+        try:
+            async with get_database_connection() as conn:
+                # Verify item belongs to a structure in this school
+                item_check = await conn.fetchrow(
+                    """
+                    SELECT fi.id FROM finance.fee_items fi
+                    JOIN finance.fee_structures fs ON fi.fee_structure_id = fs.id
+                    WHERE fi.id = $1 AND fs.school_id = $2
+                    """,
+                    item_id, school_id
+                )
+                if not item_check:
+                    raise HTTPException(status_code=404, detail="Fee item not found")
+
+                update_fields = []
+                params = []
+                param_count = 1
+
+                for field, value in item_data.dict(exclude_unset=True).items():
+                    if value is not None:
+                        update_fields.append(f"{field} = ${param_count}")
+                        params.append(value)
+                        param_count += 1
+
+                if not update_fields:
+                    raise HTTPException(status_code=400, detail="No fields to update")
+
+                update_fields.append("updated_at = NOW()")
+
+                query = f"""
+                    UPDATE finance.fee_items
+                    SET {', '.join(update_fields)}
+                    WHERE id = ${param_count}
+                    RETURNING *
+                """
+                params.append(item_id)
+
+                row = await conn.fetchrow(query, *params)
+                if not row:
+                    raise HTTPException(status_code=404, detail="Fee item not found")
+
+                logger.info(f"Updated fee item {item_id}")
+                return FeeItemResponse(**dict(row))
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error updating fee item: {e}")
+            raise HTTPException(status_code=500, detail="Failed to update fee item")
+
+    @staticmethod
+    async def delete_fee_item(item_id: UUID, school_id: UUID) -> bool:
+        """Delete a fee item"""
+        try:
+            async with get_database_connection() as conn:
+                # Verify item belongs to a structure in this school
+                result = await conn.execute(
+                    """
+                    DELETE FROM finance.fee_items
+                    WHERE id = $1 AND fee_structure_id IN (
+                        SELECT id FROM finance.fee_structures WHERE school_id = $2
+                    )
+                    """,
+                    item_id, school_id
+                )
+
+                if result == "DELETE 0":
+                    raise HTTPException(status_code=404, detail="Fee item not found")
+
+                logger.info(f"Deleted fee item {item_id}")
+                return True
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error deleting fee item: {e}")
+            raise HTTPException(status_code=500, detail="Failed to delete fee item")
+
+# =====================================================
+# STUDENT FEE ASSIGNMENT CRUD
+# =====================================================
+
+class StudentFeeAssignmentCRUD:
+    """CRUD operations for student fee assignments"""
+
+    @staticmethod
+    async def get_student_assignments(student_id: UUID, school_id: UUID) -> List[StudentFeeAssignmentResponse]:
+        """Get all fee assignments for a student"""
+        try:
+            async with get_database_connection() as conn:
+                rows = await conn.fetch(
+                    """
+                    SELECT sfa.*,
+                           json_build_object(
+                               'id', fs.id, 'school_id', fs.school_id, 'name', fs.name,
+                               'description', fs.description, 'academic_year_id', fs.academic_year_id,
+                               'grade_levels', fs.grade_levels, 'status', fs.status,
+                               'applicable_from', fs.applicable_from, 'applicable_to', fs.applicable_to,
+                               'is_default', fs.is_default, 'created_by', fs.created_by,
+                               'created_at', fs.created_at, 'updated_at', fs.updated_at
+                           ) as fee_structure
+                    FROM finance.student_fee_assignments sfa
+                    JOIN finance.fee_structures fs ON sfa.fee_structure_id = fs.id
+                    WHERE sfa.student_id = $1 AND fs.school_id = $2
+                    ORDER BY sfa.created_at DESC
+                    """,
+                    student_id, school_id
+                )
+                return [StudentFeeAssignmentResponse(**dict(row)) for row in rows]
+
+        except Exception as e:
+            logger.error(f"Error fetching student fee assignments: {e}")
+            raise HTTPException(status_code=500, detail="Failed to fetch student fee assignments")
+
+    @staticmethod
+    async def create_assignment(assignment_data: StudentFeeAssignmentCreate, current_user: EnhancedUser) -> StudentFeeAssignmentResponse:
+        """Assign a fee structure to a student"""
+        try:
+            async with get_database_connection() as conn:
+                # Verify fee structure exists and belongs to school
+                structure_check = await conn.fetchval(
+                    "SELECT id FROM finance.fee_structures WHERE id = $1 AND school_id = $2 AND status = 'active'",
+                    assignment_data.fee_structure_id, current_user.school_id
+                )
+                if not structure_check:
+                    raise HTTPException(status_code=404, detail="Fee structure not found or not active")
+
+                # Check for duplicate active assignment
+                existing = await conn.fetchval(
+                    """
+                    SELECT id FROM finance.student_fee_assignments
+                    WHERE student_id = $1 AND fee_structure_id = $2 AND status = 'active'
+                    """,
+                    assignment_data.student_id, assignment_data.fee_structure_id
+                )
+                if existing:
+                    raise HTTPException(status_code=400, detail="Student already assigned to this fee structure")
+
+                query = """
+                    INSERT INTO finance.student_fee_assignments
+                    (student_id, fee_structure_id, effective_from, effective_to,
+                     discount_percentage, discount_amount, discount_reason, status,
+                     assigned_by, assigned_date)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_DATE)
+                    RETURNING *
+                """
+                row = await conn.fetchrow(
+                    query,
+                    assignment_data.student_id,
+                    assignment_data.fee_structure_id,
+                    assignment_data.effective_from,
+                    assignment_data.effective_to,
+                    assignment_data.discount_percentage,
+                    assignment_data.discount_amount,
+                    assignment_data.discount_reason,
+                    assignment_data.status,
+                    current_user.id
+                )
+
+                logger.info(f"Assigned fee structure {assignment_data.fee_structure_id} to student {assignment_data.student_id}")
+                return StudentFeeAssignmentResponse(**dict(row))
+
+        except HTTPException:
+            raise
+        except asyncpg.UniqueViolationError:
+            raise HTTPException(status_code=400, detail="Assignment already exists")
+        except Exception as e:
+            logger.error(f"Error creating student fee assignment: {e}")
+            raise HTTPException(status_code=500, detail="Failed to create student fee assignment")
+
+    @staticmethod
+    async def update_assignment(assignment_id: UUID, assignment_data: StudentFeeAssignmentUpdate, school_id: UUID) -> StudentFeeAssignmentResponse:
+        """Update a student fee assignment"""
+        try:
+            async with get_database_connection() as conn:
+                # Verify assignment belongs to school
+                assignment_check = await conn.fetchrow(
+                    """
+                    SELECT sfa.id FROM finance.student_fee_assignments sfa
+                    JOIN finance.fee_structures fs ON sfa.fee_structure_id = fs.id
+                    WHERE sfa.id = $1 AND fs.school_id = $2
+                    """,
+                    assignment_id, school_id
+                )
+                if not assignment_check:
+                    raise HTTPException(status_code=404, detail="Assignment not found")
+
+                update_fields = []
+                params = []
+                param_count = 1
+
+                for field, value in assignment_data.dict(exclude_unset=True).items():
+                    if value is not None:
+                        update_fields.append(f"{field} = ${param_count}")
+                        params.append(value)
+                        param_count += 1
+
+                if not update_fields:
+                    raise HTTPException(status_code=400, detail="No fields to update")
+
+                update_fields.append("updated_at = NOW()")
+
+                query = f"""
+                    UPDATE finance.student_fee_assignments
+                    SET {', '.join(update_fields)}
+                    WHERE id = ${param_count}
+                    RETURNING *
+                """
+                params.append(assignment_id)
+
+                row = await conn.fetchrow(query, *params)
+                if not row:
+                    raise HTTPException(status_code=404, detail="Assignment not found")
+
+                logger.info(f"Updated student fee assignment {assignment_id}")
+                return StudentFeeAssignmentResponse(**dict(row))
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error updating student fee assignment: {e}")
+            raise HTTPException(status_code=500, detail="Failed to update student fee assignment")
+
+    @staticmethod
+    async def delete_assignment(assignment_id: UUID, school_id: UUID) -> bool:
+        """Cancel a student fee assignment"""
+        try:
+            async with get_database_connection() as conn:
+                result = await conn.execute(
+                    """
+                    UPDATE finance.student_fee_assignments
+                    SET status = 'cancelled', updated_at = NOW()
+                    WHERE id = $1 AND fee_structure_id IN (
+                        SELECT id FROM finance.fee_structures WHERE school_id = $2
+                    )
+                    """,
+                    assignment_id, school_id
+                )
+
+                if result == "UPDATE 0":
+                    raise HTTPException(status_code=404, detail="Assignment not found")
+
+                logger.info(f"Cancelled student fee assignment {assignment_id}")
+                return True
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error cancelling student fee assignment: {e}")
+            raise HTTPException(status_code=500, detail="Failed to cancel student fee assignment")
+
+    @staticmethod
+    async def bulk_assign(fee_structure_id: UUID, student_ids: List[UUID], current_user: EnhancedUser) -> Dict[str, Any]:
+        """Bulk assign a fee structure to multiple students"""
+        try:
+            async with get_database_connection() as conn:
+                async with conn.transaction():
+                    assigned = []
+                    skipped = []
+
+                    for student_id in student_ids:
+                        # Check for existing active assignment
+                        existing = await conn.fetchval(
+                            """
+                            SELECT id FROM finance.student_fee_assignments
+                            WHERE student_id = $1 AND fee_structure_id = $2 AND status = 'active'
+                            """,
+                            student_id, fee_structure_id
+                        )
+
+                        if existing:
+                            skipped.append(str(student_id))
+                            continue
+
+                        await conn.execute(
+                            """
+                            INSERT INTO finance.student_fee_assignments
+                            (student_id, fee_structure_id, effective_from, status, assigned_by, assigned_date)
+                            VALUES ($1, $2, CURRENT_DATE, 'active', $3, CURRENT_DATE)
+                            """,
+                            student_id, fee_structure_id, current_user.id
+                        )
+                        assigned.append(str(student_id))
+
+                    logger.info(f"Bulk assigned fee structure {fee_structure_id}: {len(assigned)} assigned, {len(skipped)} skipped")
+
+                    return {
+                        "total_requested": len(student_ids),
+                        "total_assigned": len(assigned),
+                        "total_skipped": len(skipped),
+                        "assigned_student_ids": assigned,
+                        "skipped_student_ids": skipped
+                    }
+
+        except Exception as e:
+            logger.error(f"Error in bulk fee assignment: {e}")
+            raise HTTPException(status_code=500, detail="Failed to bulk assign fee structure")
+
+    @staticmethod
+    async def bulk_assign_by_grade(fee_structure_id: UUID, grade_levels: List[int], current_user: EnhancedUser) -> Dict[str, Any]:
+        """Bulk assign a fee structure to students by grade level"""
+        try:
+            async with get_database_connection() as conn:
+                async with conn.transaction():
+                    # Get students in the specified grade levels
+                    students = await conn.fetch(
+                        """
+                        SELECT id FROM sis.students
+                        WHERE school_id = $1 AND current_grade_level = ANY($2) AND is_active = TRUE
+                        """,
+                        current_user.school_id, grade_levels
+                    )
+
+                    if not students:
+                        raise HTTPException(status_code=400, detail="No students found in the specified grade levels")
+
+                    student_ids = [row['id'] for row in students]
+
+                    assigned = []
+                    skipped = []
+
+                    for student_id in student_ids:
+                        existing = await conn.fetchval(
+                            """
+                            SELECT id FROM finance.student_fee_assignments
+                            WHERE student_id = $1 AND fee_structure_id = $2 AND status = 'active'
+                            """,
+                            student_id, fee_structure_id
+                        )
+
+                        if existing:
+                            skipped.append(str(student_id))
+                            continue
+
+                        await conn.execute(
+                            """
+                            INSERT INTO finance.student_fee_assignments
+                            (student_id, fee_structure_id, effective_from, status, assigned_by, assigned_date)
+                            VALUES ($1, $2, CURRENT_DATE, 'active', $3, CURRENT_DATE)
+                            """,
+                            student_id, fee_structure_id, current_user.id
+                        )
+                        assigned.append(str(student_id))
+
+                    logger.info(f"Bulk assigned by grade: {len(assigned)} assigned, {len(skipped)} skipped")
+
+                    return {
+                        "total_students_found": len(student_ids),
+                        "total_assigned": len(assigned),
+                        "total_skipped": len(skipped),
+                        "grade_levels": grade_levels,
+                        "assigned_student_ids": assigned,
+                        "skipped_student_ids": skipped
+                    }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error in bulk fee assignment by grade: {e}")
+            raise HTTPException(status_code=500, detail="Failed to bulk assign fee structure by grade")
+
 # =====================================================
 # INVOICE CRUD
 # =====================================================

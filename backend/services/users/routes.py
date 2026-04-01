@@ -11,8 +11,33 @@ from uuid import UUID
 import logging
 
 from shared.database import get_async_session
-from shared.models.platform_user import PlatformUser, PlatformRole
+from shared.models.platform_user import PlatformUser, GlobalRole as PlatformRole
 from shared.auth import get_current_active_user, require_permission
+
+ADMIN_ROLES = {'super_admin', 'platform_admin', 'school_admin'}
+STAFF_ROLES = ADMIN_ROLES | {'teacher', 'registrar', 'principal', 'deputy_principal', 'academic_head', 'department_head', 'bursar'}
+
+
+def _is_admin(user) -> bool:
+    """Check if user has an admin-level role"""
+    return getattr(user, 'platform_role', None) in ADMIN_ROLES
+
+
+def _is_staff(user) -> bool:
+    """Check if user has a staff-level role (admin or teacher)"""
+    role = getattr(user, 'platform_role', None)
+    if role in STAFF_ROLES:
+        return True
+    # Check school memberships for school-level roles
+    for m in getattr(user, 'school_memberships', []) or []:
+        if isinstance(m, dict) and m.get('role') in STAFF_ROLES:
+            return True
+    return False
+
+
+def _is_self_or_admin(user, target_user_id: UUID) -> bool:
+    """Check if user is accessing their own data or is an admin"""
+    return str(target_user_id) == str(user.id) or _is_admin(user)
 from .schemas import (
     UserCreateRequest,
     UserUpdateRequest,
@@ -46,9 +71,8 @@ async def create_user(
     Requires admin permissions
     """
     try:
-        # Check permissions
-        # TODO: Implement proper permission checking
-        if current_user.platform_role not in ["super_admin", "school_admin"]:
+        # Check permissions - only admins can create users
+        if not _is_admin(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Insufficient permissions to create users",
@@ -88,11 +112,8 @@ async def get_user(
     Users can view their own profile, admins can view any user
     """
     try:
-        # Check permissions
-        if str(user_id) != str(current_user.id) and current_user.platform_role not in [
-            "super_admin",
-            "school_admin",
-        ]:
+        # Check permissions - users can view own profile, admins can view any
+        if not _is_self_or_admin(current_user, user_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
             )
@@ -127,20 +148,14 @@ async def update_user(
     Users can update their own profile, admins can update any user
     """
     try:
-        # Check permissions
-        if str(user_id) != str(current_user.id) and current_user.platform_role not in [
-            "super_admin",
-            "school_admin",
-        ]:
+        # Check permissions - users can update own profile, admins can update any
+        if not _is_self_or_admin(current_user, user_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
             )
 
         # Restrict what regular users can update
-        if str(user_id) == str(current_user.id) and current_user.platform_role not in [
-            "super_admin",
-            "school_admin",
-        ]:
+        if str(user_id) == str(current_user.id) and not _is_admin(current_user):
             # Regular users can't change their role or status
             user_data.platform_role = None
             user_data.status = None
@@ -171,8 +186,8 @@ async def delete_user(
     Requires admin permissions
     """
     try:
-        # Check permissions
-        if current_user.platform_role not in ["super_admin"]:
+        # Only super_admin can delete users
+        if getattr(current_user, 'platform_role', None) != 'super_admin':
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Insufficient permissions to delete users",
@@ -217,17 +232,17 @@ async def search_users(
     Search users with filters and pagination
     """
     try:
-        # Check permissions
-        if current_user.platform_role not in ["super_admin", "school_admin", "teacher"]:
+        # Check permissions - staff can search users
+        if not _is_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
             )
 
-        # Restrict search scope for non-admins
-        if current_user.platform_role == "teacher":
-            # Teachers can only see users from their schools
-            # TODO: Implement school membership check
-            pass
+        # Restrict search scope for non-admins to their own school
+        if not _is_admin(current_user):
+            school_id = getattr(current_user, 'school_id', None) or getattr(current_user, 'primary_school_id', None)
+            if school_id:
+                search_params.school_id = school_id
 
         users, total_count = await user_service.search_users(db, search_params)
 
@@ -294,8 +309,8 @@ async def bulk_operation(
     Requires admin permissions
     """
     try:
-        # Check permissions
-        if current_user.platform_role not in ["super_admin", "school_admin"]:
+        # Only admins can perform bulk operations
+        if not _is_admin(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Insufficient permissions for bulk operations",
@@ -326,8 +341,8 @@ async def get_user_statistics(
     Get user statistics for dashboard
     """
     try:
-        # Check permissions
-        if current_user.platform_role not in ["super_admin", "school_admin"]:
+        # Only admins can view statistics
+        if not _is_admin(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
             )
@@ -354,11 +369,8 @@ async def update_user_profile(
     Update user profile information
     """
     try:
-        # Check permissions - users can update their own profile
-        if str(user_id) != str(current_user.id) and current_user.platform_role not in [
-            "super_admin",
-            "school_admin",
-        ]:
+        # Check permissions - users can update their own profile, admins any
+        if not _is_self_or_admin(current_user, user_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
             )
@@ -401,11 +413,8 @@ async def reset_user_password(
     Requires admin permissions or self-service
     """
     try:
-        # Check permissions
-        if str(user_id) != str(current_user.id) and current_user.platform_role not in [
-            "super_admin",
-            "school_admin",
-        ]:
+        # Check permissions - self or admin
+        if not _is_self_or_admin(current_user, user_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
             )
@@ -451,11 +460,8 @@ async def get_user_sessions(
     Get active sessions for a user
     """
     try:
-        # Check permissions
-        if str(user_id) != str(current_user.id) and current_user.platform_role not in [
-            "super_admin",
-            "school_admin",
-        ]:
+        # Check permissions - self or admin
+        if not _is_self_or_admin(current_user, user_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
             )

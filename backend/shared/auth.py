@@ -340,12 +340,24 @@ async def get_available_features(subscription_tier: str) -> List[str]:
 def require_permission(permission: str):
     """Decorator to require specific permission"""
     def decorator(func):
+        from functools import wraps
+        @wraps(func)
         async def wrapper(*args, **kwargs):
             current_user = kwargs.get('current_user')
             if not current_user:
                 raise HTTPException(status_code=401, detail="Authentication required")
-            if "*" not in current_user.permissions and permission not in current_user.permissions:
-                raise HTTPException(status_code=403, detail=f"Permission required: {permission}")
+            # Super admin / platform admin bypass
+            if getattr(current_user, 'platform_role', None) in [
+                GlobalRole.SUPER_ADMIN.value, GlobalRole.PLATFORM_ADMIN.value,
+                'super_admin', 'platform_admin'
+            ]:
+                return await func(*args, **kwargs)
+            user_perms = getattr(current_user, 'permissions', []) or []
+            if "*" not in user_perms and permission not in user_perms:
+                # Check dot-prefix match (e.g. "finance.read" matches "finance.*")
+                module = permission.split('.')[0] if '.' in permission else None
+                if not module or f"{module}.*" not in user_perms:
+                    raise HTTPException(status_code=403, detail=f"Permission required: {permission}")
             return await func(*args, **kwargs)
         return wrapper
     return decorator
@@ -475,9 +487,28 @@ async def get_websocket_user(token: Optional[str]):
 def require_feature(feature: str):
     """Decorator to require a specific feature enabled for the school"""
     def decorator(func):
+        from functools import wraps
+        @wraps(func)
         async def wrapper(*args, **kwargs):
-            # Feature gating is handled at the subscription tier level;
-            # for now, allow all features and enforce at the frontend.
+            current_user = kwargs.get('current_user')
+            if not current_user:
+                return await func(*args, **kwargs)
+            # Super admin bypasses feature checks
+            if getattr(current_user, 'platform_role', None) in [
+                GlobalRole.SUPER_ADMIN.value, GlobalRole.PLATFORM_ADMIN.value,
+                'super_admin', 'platform_admin'
+            ]:
+                return await func(*args, **kwargs)
+            # Check if the school's subscription includes this feature
+            school_id = getattr(current_user, 'school_id', None) or getattr(current_user, 'primary_school_id', None)
+            if school_id:
+                tier = await get_school_subscription_tier(school_id)
+                available = await get_available_features(tier)
+                if feature not in available:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Feature '{feature}' not available on your subscription plan"
+                    )
             return await func(*args, **kwargs)
         return wrapper
     return decorator
