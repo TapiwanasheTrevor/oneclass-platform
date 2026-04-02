@@ -13,6 +13,8 @@ __pycache__/
 dist/
 build/
 .next/
+.pytest_cache/
+coverage/
 *.pyc
 
 # IDE
@@ -34,7 +36,11 @@ Thumbs.db
 
 # Logs
 *.log
+backend/nohup.out
 
 # Database
 *.db
 *.sqlite
+
+# Generated test artifacts
+backend/test_results/

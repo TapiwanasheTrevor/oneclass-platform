@@ -5,9 +5,8 @@
 // File: frontend/app/super-admin/page.tsx
 // =====================================================
 
-'use client';
-
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
@@ -25,10 +24,8 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Settings,
-  Plus,
   BarChart3,
-  FileText,
+  Package,
   Shield
 } from 'lucide-react';
 import {
@@ -193,13 +190,17 @@ export default function SuperAdminDashboard() {
           </p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline">
-            <FileText className="w-4 h-4 mr-2" />
-            Generate Report
+          <Button variant="outline" asChild>
+            <Link href="/analytics">
+              <BarChart3 className="w-4 h-4 mr-2" />
+              View Analytics
+            </Link>
           </Button>
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Add School
+          <Button asChild>
+            <Link href="/admin/migration/care-packages">
+              <Package className="w-4 h-4 mr-2" />
+              Care Packages
+            </Link>
           </Button>
         </div>
       </div>
@@ -355,8 +356,8 @@ export default function SuperAdminDashboard() {
         <TabsContent value="schools" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Schools Management</CardTitle>
-              <CardDescription>Manage all schools on the platform</CardDescription>
+              <CardTitle>Schools Overview</CardTitle>
+              <CardDescription>Monitor all schools on the platform</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -368,13 +369,12 @@ export default function SuperAdminDashboard() {
                     <TableHead>Revenue</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Admin</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {schoolsLoading ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-4">
+                      <TableCell colSpan={6} className="text-center py-4">
                         Loading schools...
                       </TableCell>
                     </TableRow>
@@ -409,11 +409,6 @@ export default function SuperAdminDashboard() {
                             <p className="font-medium">{school.admin_name}</p>
                             <p className="text-gray-500">{school.admin_email}</p>
                           </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm">
-                            <Settings className="w-4 h-4" />
-                          </Button>
                         </TableCell>
                       </TableRow>
                     ))
@@ -511,7 +506,11 @@ export default function SuperAdminDashboard() {
                 <p className="text-gray-600 mb-4">
                   Detailed analytics and reporting will be available here.
                 </p>
-                <Button>View Full Analytics</Button>
+                <Button asChild>
+                  <Link href="/analytics">
+                    View Analytics Dashboard
+                  </Link>
+                </Button>
               </div>
             </CardContent>
           </Card>

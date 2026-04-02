@@ -393,7 +393,7 @@ Completed in this pass:
 Still open in Phase 1:
 
 - Mixed sync SQLAlchemy, async SQLAlchemy, and raw `asyncpg` access is reduced but not fully eliminated across non-auth modules.
-- Finance still uses raw `asyncpg` extensively by design, and user-management plus migration-services still retain older sync-session service patterns.
+- Finance still uses raw `asyncpg` extensively by design, and migration-services retains older service patterns.
 - Legacy duplicate school-resolution routes were removed in the cleanup pass, leaving `/api/v1/platform/schools/...` as the only supported public school-discovery contract.
 
 ### Phase 2: Frontend Context Unification
@@ -443,14 +443,12 @@ Completed in the current follow-up pass:
 - Onboarding form state was typed end-to-end instead of relying on untyped `{}` state.
 - Finance invoice date handling was normalized for the current calendar component contract.
 - Migration, admin, parent, staff, SIS, and onboarding component typing gaps were cleaned up.
-- Missing user-management dialog/list components were added as temporary platform-safe shells so the feature area compiles cleanly instead of depending on nonexistent files.
 - Verified passing commands:
   - `cd frontend && npm run type-check`
   - `npm run build`
 
 Still open in Phase 3:
 
-- The frontend build is green, but several placeholder user-management subcomponents still need proper production implementations.
 - The deprecated Next.js `middleware.ts` entrypoint was replaced with `proxy.ts`.
 - The build is currently configured to skip type validation inside `next build`; the dedicated `npm run type-check` command now covers that gate explicitly.
 
@@ -460,13 +458,13 @@ The platform kernel is materially more trustworthy than it was at the start of t
 
 The two hard gates that were blocking safe expansion have now moved from red to mostly green:
 
-1. backend DB access is normalized across the platform/auth/academic/SIS/integration paths, with residual legacy cleanup still needed in finance, migration-services, and user-management
+1. backend DB access is normalized across the platform/auth/academic/SIS/integration paths, with residual legacy cleanup still needed in finance and migration-services
 2. frontend `type-check` is now green and repo build is green
 
 The correct next step is:
 
 1. finish the residual Phase 1 DB-pattern cleanup in the older service areas
-2. replace placeholder user-management shells with full implementations
+2. finish migration-services cleanup or remove any remaining mock-only admin surfaces
 3. then resume MVP module expansion on a more trustworthy kernel
 
 ## Expansion Readiness Proof: 2026-04-01
@@ -494,7 +492,6 @@ This pass moved the codebase from "green on a narrow path" to "verifiable expans
   - `GET /api/v1/sis/health`
   - `GET /api/v1/academic/health`
   - `GET /api/v1/finance/health`
-  - `GET /api/v1/users/health`
   - `GET /api/v1/migration-services/health`
 - Frontend `npm run type-check` passes.
 - Root `npm run build` passes.
@@ -525,9 +522,7 @@ Behavioral test completeness is still below the expansion bar:
 
 - Backend build verification was strengthened from `py_compile main.py` to full module compile coverage.
 - Legacy public school route trees were removed so tenant discovery now resolves only through the canonical platform router.
-- `user_management` and `migration_services` are now treated honestly as experimental modules and are disabled by default unless explicitly enabled with env flags:
-  - `ONECLASS_ENABLE_EXPERIMENTAL_USER_MANAGEMENT=true`
-  - `ONECLASS_ENABLE_EXPERIMENTAL_MIGRATION_SERVICES=true`
+- `migration_services` remains experimental and is disabled by default unless explicitly enabled with `ONECLASS_ENABLE_EXPERIMENTAL_MIGRATION_SERVICES=true`
 - Disabled modules still expose health endpoints so operators can see that the module is intentionally quarantined rather than silently broken.
 - Shared compatibility shims were added so older service modules can import cleanly while the platform continues converging on the unified auth/database stack.
 - Dead sidecar code was removed from the repo:
@@ -536,6 +531,9 @@ Behavioral test completeness is still below the expansion bar:
   - the extra `useSchoolContext` export from `useAuth`
   - the unused `SchoolSelector` component
   - the deprecated `frontend/middleware.ts` file
+  - dead user-management and api-docs service trees
+  - demo test pages and mock-only migration admin dashboard routes
+  - the duplicate mock super-admin dashboard component and its stale links
 
 ### Completeness Status For Expansion
 
@@ -552,7 +550,6 @@ Stable enough to expand on now:
 
 Not yet ready to treat as expansion foundations:
 
-- legacy user-management backend
 - legacy migration-services backend
 - optional SSO/SAML runtime behavior without third-party packages installed
 

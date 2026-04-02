@@ -51,7 +51,6 @@ required_route_contracts = {
     ("GET", "/api/v1/sis/health"),
     ("GET", "/api/v1/academic/health"),
     ("GET", "/api/v1/finance/health"),
-    ("GET", "/api/v1/users/health"),
     ("GET", "/api/v1/migration-services/health"),
 }
 
@@ -90,7 +89,6 @@ cat <<'EOF'
 
 Expansion readiness verification passed.
 
-Default guarded modules:
-- user management routes are disabled unless `ONECLASS_ENABLE_EXPERIMENTAL_USER_MANAGEMENT=true`
+Default guarded module:
 - migration services routes are disabled unless `ONECLASS_ENABLE_EXPERIMENTAL_MIGRATION_SERVICES=true`
 EOF

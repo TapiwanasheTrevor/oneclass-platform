@@ -232,7 +232,7 @@ handoff_structure:
   deliverables:
     - api_endpoints: [list of completed endpoints]
     - test_results: "coverage_report.html"
-    - documentation: "api_docs.md"
+    - documentation: "docs/PLATFORM_ALIGNMENT_REVIEW_AND_ROADMAP.md"
   next_actions:
     - "Implement UI for new endpoints"
     - "Add error handling for edge cases"

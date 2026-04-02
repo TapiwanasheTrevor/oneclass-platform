@@ -5,14 +5,12 @@
 
 'use client';
 
+import Link from 'next/link';
 import React, { useState } from 'react';
-import { useAuth, GlobalRole, SchoolRole } from '@/hooks/useAuth';
+import { useAuth, SchoolRole } from '@/hooks/useAuth';
 import { useSchoolContext } from '@/hooks/useSchoolContext';
 import { useRouter, usePathname } from 'next/navigation';
 import {
-  Bell,
-  Settings,
-  User,
   Building2,
   ChevronDown,
   Globe,
@@ -20,8 +18,8 @@ import {
   GraduationCap,
   BarChart3,
   DollarSign,
-  FileText,
   Shield,
+  Home,
   LogOut,
   Menu,
   X
@@ -43,9 +41,6 @@ interface NavigationItem {
   label: string;
   href: string;
   icon: React.ReactNode;
-  roles?: GlobalRole[] | SchoolRole[];
-  permissions?: string[];
-  badge?: string;
 }
 
 export function PlatformNavigation() {
@@ -68,25 +63,16 @@ export function PlatformNavigation() {
           label: 'Platform Overview',
           href: '/super-admin',
           icon: <Globe className="w-4 h-4" />,
-          roles: [GlobalRole.SUPER_ADMIN]
         },
         {
-          label: 'Schools Management',
-          href: '/super-admin/schools',
-          icon: <Building2 className="w-4 h-4" />,
-          roles: [GlobalRole.SUPER_ADMIN]
-        },
-        {
-          label: 'Platform Analytics',
-          href: '/super-admin/analytics',
+          label: 'Analytics',
+          href: '/analytics',
           icon: <BarChart3 className="w-4 h-4" />,
-          roles: [GlobalRole.SUPER_ADMIN]
         },
         {
-          label: 'System Settings',
-          href: '/super-admin/settings',
-          icon: <Settings className="w-4 h-4" />,
-          roles: [GlobalRole.SUPER_ADMIN]
+          label: 'Care Packages',
+          href: '/admin/migration/care-packages',
+          icon: <Building2 className="w-4 h-4" />,
         }
       );
     }
@@ -106,7 +92,6 @@ export function PlatformNavigation() {
           label: 'Students',
           href: '/students',
           icon: <GraduationCap className="w-4 h-4" />,
-          permissions: ['students.read']
         });
       }
 
@@ -116,7 +101,6 @@ export function PlatformNavigation() {
           label: 'Staff',
           href: '/staff',
           icon: <Users className="w-4 h-4" />,
-          permissions: ['staff.read']
         });
       }
 
@@ -126,7 +110,6 @@ export function PlatformNavigation() {
           label: 'Finance',
           href: '/finance',
           icon: <DollarSign className="w-4 h-4" />,
-          permissions: ['finance.read']
         });
       }
 
@@ -135,60 +118,23 @@ export function PlatformNavigation() {
         label: 'Analytics',
         href: '/analytics',
         icon: <BarChart3 className="w-4 h-4" />,
-        permissions: ['reports.view']
       });
-
-      // Academic Module (Teachers, Academic Head)
-      if (currentSchool.role === SchoolRole.TEACHER || 
-          currentSchool.role === SchoolRole.ACADEMIC_HEAD ||
-          isSchoolAdmin()) {
-        items.push({
-          label: 'Academic',
-          href: '/academic',
-          icon: <FileText className="w-4 h-4" />,
-          permissions: ['academic.read']
-        });
-      }
 
       // Parent Portal
       if (currentSchool.role === SchoolRole.PARENT) {
-        items.push(
-          {
-            label: 'My Children',
-            href: '/parent/children',
-            icon: <Users className="w-4 h-4" />
-          },
-          {
-            label: 'Payments',
-            href: '/parent/payments',
-            icon: <DollarSign className="w-4 h-4" />
-          }
-        );
+        items.push({
+          label: 'Parent Portal',
+          href: '/parent',
+          icon: <Users className="w-4 h-4" />
+        });
       }
 
       // Student Portal
       if (currentSchool.role === SchoolRole.STUDENT) {
-        items.push(
-          {
-            label: 'My Classes',
-            href: '/student/classes',
-            icon: <GraduationCap className="w-4 h-4" />
-          },
-          {
-            label: 'Assignments',
-            href: '/student/assignments',
-            icon: <FileText className="w-4 h-4" />
-          }
-        );
-      }
-
-      // Settings (Admins)
-      if (isSchoolAdmin()) {
         items.push({
-          label: 'Settings',
-          href: '/settings',
-          icon: <Settings className="w-4 h-4" />,
-          permissions: ['settings.manage']
+          label: 'Student Portal',
+          href: '/student',
+          icon: <GraduationCap className="w-4 h-4" />
         });
       }
     }
@@ -198,8 +144,8 @@ export function PlatformNavigation() {
 
   const navigationItems = getNavigationItems();
 
-  const handleSchoolSwitch = (schoolId: string) => {
-    switchSchool(schoolId);
+  const handleSchoolSwitch = async (schoolId: string) => {
+    await switchSchool(schoolId);
     router.refresh();
   };
 
@@ -246,7 +192,7 @@ export function PlatformNavigation() {
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center space-x-6">
           {navigationItems.map((item) => (
-            <a
+            <Link
               key={item.href}
               href={item.href}
               className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -257,12 +203,7 @@ export function PlatformNavigation() {
             >
               {item.icon}
               <span>{item.label}</span>
-              {item.badge && (
-                <Badge variant="secondary" className="ml-1">
-                  {item.badge}
-                </Badge>
-              )}
-            </a>
+            </Link>
           ))}
         </div>
 
@@ -284,7 +225,7 @@ export function PlatformNavigation() {
                 {availableSchools.map((school) => (
                   <DropdownMenuItem
                     key={school.school_id}
-                    onClick={() => handleSchoolSwitch(school.school_id)}
+                    onClick={() => void handleSchoolSwitch(school.school_id)}
                     className={currentSchool?.school_id === school.school_id ? 'bg-blue-50' : ''}
                   >
                     <div className="flex flex-col">
@@ -301,11 +242,6 @@ export function PlatformNavigation() {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-
-          {/* Notifications */}
-          <Button variant="ghost" size="sm">
-            <Bell className="w-4 h-4" />
-          </Button>
 
           {/* User Menu */}
           <DropdownMenu>
@@ -330,13 +266,15 @@ export function PlatformNavigation() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push('/profile')}>
-                <User className="mr-2 h-4 w-4" />
-                <span>Profile</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push('/settings')}>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
+              {currentSchool && (
+                <DropdownMenuItem onClick={() => router.push('/dashboard')}>
+                  <Home className="mr-2 h-4 w-4" />
+                  <span>Dashboard</span>
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={() => router.push('/analytics')}>
+                <BarChart3 className="mr-2 h-4 w-4" />
+                <span>Analytics</span>
               </DropdownMenuItem>
               {isPlatformAdmin && (
                 <DropdownMenuItem onClick={() => router.push('/super-admin')}>
@@ -369,7 +307,7 @@ export function PlatformNavigation() {
         <div className="md:hidden mt-4 pb-4 border-t border-gray-200">
           <div className="space-y-2 pt-4">
             {navigationItems.map((item) => (
-              <a
+              <Link
                 key={item.href}
                 href={item.href}
                 className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -381,12 +319,7 @@ export function PlatformNavigation() {
               >
                 {item.icon}
                 <span>{item.label}</span>
-                {item.badge && (
-                  <Badge variant="secondary" className="ml-auto">
-                    {item.badge}
-                  </Badge>
-                )}
-              </a>
+              </Link>
             ))}
           </div>
         </div>

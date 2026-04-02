@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { Suspense } from 'react';
+import Link from 'next/link';
 import { Users, GraduationCap, DollarSign, TrendingUp, Calendar, AlertCircle, Settings, BookOpen, Activity, FileText } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +20,6 @@ import { RecentActivity } from '@/components/admin/RecentActivity';
 import { SchoolOverview } from '@/components/admin/SchoolOverview';
 import { StudentMetrics } from '@/components/admin/StudentMetrics';
 import { FinancialSummary } from '@/components/admin/FinancialSummary';
-import { StaffOverview } from '@/components/admin/StaffOverview';
 import { AcademicProgress } from '@/components/admin/AcademicProgress';
 import { SystemAlerts } from '@/components/admin/SystemAlerts';
 import { useAuth } from '@/hooks/useAuth';
@@ -46,9 +46,11 @@ const AdminDashboard = () => {
           <Badge variant="outline" className="text-sm">
             {schoolTier}
           </Badge>
-          <Button variant="outline" size="sm">
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/analytics/reports">
+              <FileText className="h-4 w-4 mr-2" />
+              Reports
+            </Link>
           </Button>
         </div>
       </div>
@@ -97,11 +99,6 @@ const AdminDashboard = () => {
           {/* Quick Actions */}
           <Suspense fallback={<Card className="h-64 animate-pulse" />}>
             <QuickActions />
-          </Suspense>
-
-          {/* Staff Overview */}
-          <Suspense fallback={<Card className="h-64 animate-pulse" />}>
-            <StaffOverview />
           </Suspense>
 
           {/* Recent Activity */}

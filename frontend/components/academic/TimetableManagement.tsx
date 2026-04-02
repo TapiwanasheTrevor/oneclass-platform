@@ -522,7 +522,7 @@ export default function TimetableManagement({ academicYearId, className }: Timet
                   <div>
                     <Label htmlFor="teacher_id">Teacher*</Label>
                     <Input
-                      placeholder="Teacher ID (from user management)"
+                      placeholder="Teacher ID"
                       {...registerTimetable("teacher_id")}
                     />
                     {timetableErrors.teacher_id && (

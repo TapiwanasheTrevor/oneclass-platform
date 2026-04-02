@@ -8,15 +8,15 @@ import {
   UserCheck,
   Receipt,
   BarChart3,
-  Settings,
+  Package,
 } from 'lucide-react';
 
 const actions = [
-  { label: 'Add Student', href: '/admin/students/new', icon: UserPlus, color: 'text-blue-600' },
-  { label: 'Add Staff', href: '/admin/staff/new', icon: UserCheck, color: 'text-green-600' },
-  { label: 'Generate Invoices', href: '/admin/finance/invoices/generate', icon: Receipt, color: 'text-amber-600' },
-  { label: 'View Reports', href: '/admin/reports', icon: BarChart3, color: 'text-purple-600' },
-  { label: 'System Settings', href: '/admin/settings', icon: Settings, color: 'text-gray-600' },
+  { label: 'Enroll Student', href: '/students/enrollment', icon: UserPlus, color: 'text-blue-600' },
+  { label: 'Staff Dashboard', href: '/staff', icon: UserCheck, color: 'text-green-600' },
+  { label: 'Finance Overview', href: '/finance', icon: Receipt, color: 'text-amber-600' },
+  { label: 'Analytics', href: '/analytics', icon: BarChart3, color: 'text-purple-600' },
+  { label: 'Migration Services', href: '/migration', icon: Package, color: 'text-gray-600' },
 ];
 
 export function QuickActions() {

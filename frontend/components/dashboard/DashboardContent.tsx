@@ -1,14 +1,13 @@
 "use client"
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth, SchoolRole } from '@/hooks/useAuth';
 import { useSchoolContext } from '@/hooks/useSchoolContext';
 import { api } from '@/lib/api';
 import RoleBasedDashboard from '@/components/dashboard/RoleBasedDashboard';
-import SuperAdminDashboard from '@/components/admin/SuperAdminDashboard';
 import { ProgressTracker } from '@/components/progress/ProgressTracker';
 import { DashboardLoading, PageLoading } from '@/components/ui/loading';
-import { ErrorMessage, NetworkError } from '@/components/ui/error-boundary';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { useMigrationCarePackage } from '@/hooks/useMigrationCarePackage';
 import MigrationCarePackageModal from '@/components/migration/MigrationCarePackageModal';
@@ -16,6 +15,7 @@ import MigrationCarePackageModal from '@/components/migration/MigrationCarePacka
 export default function DashboardContent() {
   const { user, isLoading: authLoading, isPlatformAdmin } = useAuth();
   const { currentSchool } = useSchoolContext();
+  const router = useRouter();
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,18 +26,7 @@ export default function DashboardContent() {
     shouldBlockDashboard,
     setDecision,
     dismissModal,
-    state: migrationState
   } = useMigrationCarePackage();
-
-  // Debug logging
-  console.log('Migration Care Package Debug:', {
-    showMigrationModal,
-    shouldBlockDashboard,
-    migrationState,
-    user: user?.email,
-    authLoading,
-    loading
-  });
 
   // Map our platform roles to the dashboard component's expected format
   const mapUserRole = (): 'admin' | 'teacher' | 'parent' | 'student' => {
@@ -95,10 +84,38 @@ export default function DashboardContent() {
   };
 
   useEffect(() => {
-    if (user && !authLoading) {
-      fetchDashboardData();
+    if (!user || authLoading) {
+      return;
     }
+
+    if (isPlatformAdmin && user.global_role === 'super_admin') {
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    void fetchDashboardData();
   }, [user, currentSchool, userRole, authLoading, isPlatformAdmin]);
+
+  useEffect(() => {
+    if (
+      !authLoading &&
+      !loading &&
+      isPlatformAdmin &&
+      user?.global_role === 'super_admin' &&
+      !(showMigrationModal && shouldBlockDashboard)
+    ) {
+      router.replace('/super-admin');
+    }
+  }, [
+    authLoading,
+    isPlatformAdmin,
+    loading,
+    router,
+    shouldBlockDashboard,
+    showMigrationModal,
+    user?.global_role,
+  ]);
 
   // Loading state
   if (authLoading) {
@@ -124,26 +141,25 @@ export default function DashboardContent() {
           <MigrationCarePackageModal
             isOpen={showMigrationModal}
             onClose={(decision) => {
-              if (decision === 'selected') {
-                // Handle package selection - could redirect to payment
-                console.log('Package selected, redirect to payment');
-              }
               setDecision(decision);
               dismissModal();
             }}
-            onSelectPackage={(packageType) => {
-              console.log('Selected package:', packageType);
-            }}
+            onSelectPackage={() => undefined}
           />
         </>
       );
     }
 
     return (
-      <SuperAdminDashboard
-        analytics={dashboardData}
-        loading={loading}
-      />
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold text-gray-900">Redirecting to platform overview</h1>
+            <p className="text-gray-600">The platform admin dashboard lives at `/super-admin`.</p>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -160,16 +176,10 @@ export default function DashboardContent() {
         <MigrationCarePackageModal
           isOpen={showMigrationModal}
           onClose={(decision) => {
-            if (decision === 'selected') {
-              // Handle package selection - could redirect to payment
-              console.log('Package selected, redirect to payment');
-            }
             setDecision(decision);
             dismissModal();
           }}
-          onSelectPackage={(packageType) => {
-            console.log('Selected package:', packageType);
-          }}
+          onSelectPackage={() => undefined}
         />
       </>
     );
@@ -234,10 +244,10 @@ export default function DashboardContent() {
             </p>
           </div>
           <button
-            onClick={() => window.location.href = '/schools'}
+            onClick={() => window.location.reload()}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
-            Select School
+            Refresh Session
           </button>
         </div>
       </div>

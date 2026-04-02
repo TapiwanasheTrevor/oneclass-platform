@@ -28,9 +28,6 @@ def _env_flag(name: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-ENABLE_EXPERIMENTAL_USER_MANAGEMENT = _env_flag(
-    "ONECLASS_ENABLE_EXPERIMENTAL_USER_MANAGEMENT", default=False
-)
 ENABLE_EXPERIMENTAL_MIGRATION_SERVICES = _env_flag(
     "ONECLASS_ENABLE_EXPERIMENTAL_MIGRATION_SERVICES", default=False
 )
@@ -234,59 +231,6 @@ except ImportError as e:
             "error": "Module not loaded",
             "timestamp": datetime.utcnow().isoformat(),
         }
-
-
-# Include User Management module
-if ENABLE_EXPERIMENTAL_USER_MANAGEMENT:
-    try:
-        from services.user_management.routes import router as user_management_router
-
-        app.include_router(user_management_router, prefix="/api/v1")
-
-        @app.get("/api/v1/users/health")
-        async def user_management_health():
-            """User Management module health check"""
-            return {
-                "status": "experimental",
-                "service": "user_management",
-                "version": "1.0.0",
-                "timestamp": datetime.utcnow().isoformat(),
-                "module": "User Management System",
-                "features": [
-                    "role_based_user_creation",
-                    "user_invitations",
-                    "bulk_user_import",
-                    "user_profile_management",
-                    "custom_roles",
-                ],
-            }
-
-        logger.warning("Experimental user management module loaded")
-
-    except ImportError as e:
-        logger.warning(f"User Management module not available: {e}")
-
-        @app.get("/api/v1/users/health")
-        async def user_management_health_fallback():
-            """User Management module health check fallback"""
-            return {
-                "status": "unavailable",
-                "service": "user_management",
-                "error": "Module not loaded",
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-else:
-    @app.get("/api/v1/users/health")
-    async def user_management_health_disabled():
-        """User Management module health check when disabled by default."""
-        return {
-            "status": "disabled",
-            "service": "user_management",
-            "error": "Experimental module disabled for expansion readiness",
-            "timestamp": datetime.utcnow().isoformat(),
-        }
-
-    logger.info("Experimental user management module disabled")
 
 
 # Include Realtime module

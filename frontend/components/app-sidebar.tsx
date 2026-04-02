@@ -1,21 +1,16 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import {
-  BookOpen,
   ChevronDown,
   DollarSign,
   GraduationCap,
   Home,
-  MessageSquare,
   Settings,
-  Shield,
-  Trophy,
   TrendingUp,
   Users,
-  Brain,
-  Globe,
-  Database,
+  Package,
 } from "lucide-react"
 
 import {
@@ -34,164 +29,73 @@ import {
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Badge } from "@/components/ui/badge"
-import { useSchoolContext, useFeatureAccess } from "@/hooks/useSchoolContext"
+import { useSchoolContext } from "@/hooks/useSchoolContext"
 import { SchoolLogo } from "@/components/providers/SchoolThemeProvider"
 
 const modules = [
   {
     title: "Dashboard",
     icon: Home,
-    url: "/",
+    url: "/dashboard",
     isActive: true,
   },
   {
-    title: "Student Information",
+    title: "Students",
     icon: Users,
     items: [
       { title: "Student Directory", url: "/students" },
       { title: "Student Registration", url: "/students/enrollment" },
-      { title: "Medical Records", url: "/students/medical" },
-      { title: "Academic History", url: "/students/academic" },
-    ],
-  },
-  {
-    title: "Academic Management",
-    icon: BookOpen,
-    items: [
-      { title: "Curriculum", url: "/academic/curriculum" },
-      { title: "Lesson Plans", url: "/academic/lessons" },
-      { title: "Assessments", url: "/academic/assessments" },
-      { title: "Grade Books", url: "/academic/grades" },
-    ],
-  },
-  {
-    title: "Teacher Tools",
-    icon: GraduationCap,
-    items: [
-      { title: "Class Management", url: "/teachers/classes" },
-      { title: "Attendance", url: "/teachers/attendance" },
-      { title: "Performance Analytics", url: "/teachers/analytics" },
-      { title: "Resource Library", url: "/teachers/resources" },
     ],
   },
   {
     title: "Finance & Billing",
     icon: DollarSign,
-    badge: "3",
     items: [
-      { title: "Fee Structure", url: "/finance/fees" },
-      { title: "Payments", url: "/finance/payments" },
-      { title: "Invoices", url: "/finance/invoices" },
-      { title: "Financial Reports", url: "/finance/reports" },
-    ],
-  },
-  {
-    title: "Communications",
-    icon: MessageSquare,
-    items: [
-      { title: "Announcements", url: "/communications/announcements" },
-      { title: "Parent Portal", url: "/communications/parents" },
-      { title: "SMS & Email", url: "/communications/messaging" },
-      { title: "Newsletters", url: "/communications/newsletters" },
-    ],
-  },
-  {
-    title: "Extracurricular",
-    icon: Trophy,
-    items: [
-      { title: "Sports & Clubs", url: "/extracurricular/activities" },
-      { title: "Events & Trips", url: "/extracurricular/events" },
-      { title: "Competitions", url: "/extracurricular/competitions" },
-      { title: "Media Gallery", url: "/extracurricular/gallery" },
-    ],
-  },
-  {
-    title: "Safety & Compliance",
-    icon: Shield,
-    items: [
-      { title: "Indemnity Forms", url: "/safety/forms" },
-      { title: "Disciplinary Records", url: "/safety/discipline" },
-      { title: "Emergency Contacts", url: "/safety/emergency" },
-      { title: "Privacy Management", url: "/safety/privacy" },
-    ],
-  },
-  {
-    title: "AI Learning Tools",
-    icon: Brain,
-    badge: "New",
-    items: [
-      { title: "Adaptive Learning", url: "/ai/adaptive" },
-      { title: "Auto Lesson Generation", url: "/ai/lessons" },
-      { title: "Performance Insights", url: "/ai/insights" },
-      { title: "Personalized Content", url: "/ai/content" },
+      { title: "Finance Overview", url: "/finance" },
     ],
   },
   {
     title: "Analytics & Reports",
     icon: TrendingUp,
-    requiredModule: "advanced_reporting",
     items: [
       { title: "Analytics Dashboard", url: "/analytics" },
       { title: "Custom Reports", url: "/analytics/reports" },
-      { title: "Data Insights", url: "/analytics/insights" },
-      { title: "Export Data", url: "/analytics/export" },
     ],
   },
   {
-    title: "Ministry Dashboard",
-    icon: Globe,
+    title: "Migration Services",
+    icon: Package,
     items: [
-      { title: "Performance Reports", url: "/ministry/performance" },
-      { title: "Curriculum Compliance", url: "/ministry/compliance" },
-      { title: "Statistical Analysis", url: "/ministry/statistics" },
-      { title: "Data Exports", url: "/ministry/exports" },
+      { title: "Migration Packages", url: "/migration" },
+      { title: "Care Packages", url: "/admin/migration/care-packages" },
     ],
   },
 ]
 
 const adminItems = [
   {
-    title: "System Settings",
+    title: "School Dashboard",
     icon: Settings,
-    url: "/admin/settings",
+    url: "/admin",
   },
   {
-    title: "User Management",
-    icon: Users,
-    url: "/admin/users",
-  },
-  {
-    title: "Data Management",
-    icon: Database,
-    url: "/admin/data",
-  },
-  {
-    title: "Analytics",
+    title: "Reports",
     icon: TrendingUp,
-    url: "/admin/analytics",
+    url: "/analytics/reports",
   },
 ]
 
 export function AppSidebar() {
-  const [openItems, setOpenItems] = useState<string[]>(["Student Information"])
+  const [openItems, setOpenItems] = useState<string[]>(["Students"])
   const schoolContext = useSchoolContext()
 
   const toggleItem = (title: string) => {
     setOpenItems((prev) => (prev.includes(title) ? prev.filter((item) => item !== title) : [...prev, title]))
   }
 
-  // Filter modules based on available features
-  const availableModules = modules.filter(module => {
-    const featureMap: Record<string, string> = {
-      "Finance & Billing": "finance_module",
-      "AI Learning Tools": "ai_assistance",
-      "Ministry Dashboard": "ministry_reporting",
-    }
-    
-    const requiredFeature = featureMap[module.title]
-    if (requiredFeature) {
-      return schoolContext?.hasFeature(requiredFeature)
+  const availableModules = modules.filter((module) => {
+    if (module.title === "Finance & Billing") {
+      return schoolContext?.hasFeature("finance_module")
     }
     return true
   })
@@ -232,11 +136,6 @@ export function AppSidebar() {
                         <SidebarMenuButton className="w-full">
                           <module.icon className="h-4 w-4" />
                           <span>{module.title}</span>
-                          {module.badge && (
-                            <Badge variant="secondary" className="ml-auto text-xs">
-                              {module.badge}
-                            </Badge>
-                          )}
                           <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                         </SidebarMenuButton>
                       </CollapsibleTrigger>
@@ -245,9 +144,9 @@ export function AppSidebar() {
                           {module.items.map((item) => (
                             <SidebarMenuSubItem key={item.title}>
                               <SidebarMenuSubButton asChild>
-                                <a href={item.url}>
+                                <Link href={item.url}>
                                   <span>{item.title}</span>
-                                </a>
+                                </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
                           ))}
@@ -256,10 +155,10 @@ export function AppSidebar() {
                     </Collapsible>
                   ) : (
                     <SidebarMenuButton asChild isActive={module.isActive}>
-                      <a href={module.url}>
+                      <Link href={module.url}>
                         <module.icon className="h-4 w-4" />
                         <span>{module.title}</span>
-                      </a>
+                      </Link>
                     </SidebarMenuButton>
                   )}
                 </SidebarMenuItem>
@@ -275,10 +174,10 @@ export function AppSidebar() {
               {adminItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <a href={item.url}>
+                    <Link href={item.url}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

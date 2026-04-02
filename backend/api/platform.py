@@ -1,6 +1,6 @@
 """
 Platform Management API
-Handles school creation, user management, and platform administration
+Handles school provisioning, discovery, and platform administration
 """
 
 from fastapi import APIRouter, HTTPException, Depends, status

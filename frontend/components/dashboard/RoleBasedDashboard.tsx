@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -102,7 +103,9 @@ function AdminDashboard({ analytics, loading, schoolContext }: { analytics: any;
           <Badge variant="outline">
             {schoolContext?.user_role || 'Administrator'}
           </Badge>
-          <Button>Generate Report</Button>
+          <Button asChild>
+            <Link href="/analytics/reports">View Reports</Link>
+          </Button>
         </div>
       </div>
 
@@ -135,21 +138,29 @@ function AdminDashboard({ analytics, loading, schoolContext }: { analytics: any;
             <CardDescription>Administrative tasks</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            <Button variant="outline" className="w-full justify-start">
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <Link href="/students">
               <Users className="mr-2 h-4 w-4" />
-              Manage Users
+              Student Directory
+              </Link>
             </Button>
-            <Button variant="outline" className="w-full justify-start">
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <Link href="/admin">
               <Settings className="mr-2 h-4 w-4" />
-              School Settings
+              Admin Console
+              </Link>
             </Button>
-            <Button variant="outline" className="w-full justify-start">
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <Link href="/analytics/reports">
               <FileText className="mr-2 h-4 w-4" />
-              Generate Reports
+              Reports
+              </Link>
             </Button>
-            <Button variant="outline" className="w-full justify-start">
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <Link href="/finance">
               <CreditCard className="mr-2 h-4 w-4" />
-              Billing & Subscription
+              Finance Overview
+              </Link>
             </Button>
           </CardContent>
         </Card>
