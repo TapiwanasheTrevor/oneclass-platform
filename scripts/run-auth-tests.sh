@@ -92,45 +92,11 @@ print_status "Coverage report generated in htmlcov/index.html"
 cd ..
 
 # Frontend Authentication Tests
-print_status "Running Frontend Authentication Tests..."
+print_status "Frontend Authentication Test Status"
 echo ""
-
-cd frontend
-
-# Check if node_modules exists
-if [ ! -d "node_modules" ]; then
-    print_warning "Node modules not found. Installing dependencies..."
-    npm install
-fi
-
-# Install test dependencies if needed
-if [ ! -d "node_modules/@testing-library" ]; then
-    print_status "Installing frontend test dependencies..."
-    npm install --save-dev @testing-library/react @testing-library/jest-dom vitest jsdom
-fi
-
-print_status "Running frontend authentication tests..."
+print_warning "Frontend unit/integration auth tests are not provisioned in this workspace."
+print_warning "The active frontend verification gate is: npm run verify:readiness"
 echo ""
-
-# Run frontend tests
-echo "1. Authentication Middleware Tests"
-npm run test tests/integration/auth-middleware.test.ts
-
-echo ""
-echo "2. Clerk Integration Tests"
-npm run test tests/integration/clerk-integration.test.ts
-
-echo ""
-echo "3. useAuth Hook Tests"
-npm run test tests/hooks/useAuth.test.ts
-
-echo ""
-echo "4. Running all authentication tests"
-npm run test -- tests/integration/auth-middleware.test.ts tests/integration/clerk-integration.test.ts tests/hooks/useAuth.test.ts
-
-print_success "Frontend authentication tests completed!"
-
-cd ..
 
 # Summary
 echo ""
@@ -140,9 +106,7 @@ print_success "✅ Core Authentication Tests"
 print_success "✅ Multi-Tenant Middleware Tests"
 print_success "✅ Role-Based Access Control Tests"
 print_success "✅ Integration Tests"
-print_success "✅ Frontend Authentication Tests"
-print_success "✅ Clerk Integration Tests"
-print_success "✅ Authentication Hooks Tests"
+print_warning "⚠ Frontend Authentication Tests Not Provisioned"
 echo ""
 print_status "All authentication tests completed successfully!"
 print_status "Security validation: PASSED"

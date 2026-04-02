@@ -510,6 +510,7 @@ This pass moved the codebase from "green on a narrow path" to "verifiable expans
 - Frontend app build now runs with real Next.js type validation again; `ignoreBuildErrors` is no longer part of the active build path.
 - Frontend E2E entrypoints now fail honestly with a provisioning message instead of pointing at a missing script.
 - Next.js output tracing root is now configured explicitly for the nested frontend app, so the build no longer depends on lockfile inference.
+- Unsupported frontend Vitest/Playwright test scaffolding was removed from the active repo because the toolchain is not provisioned in this workspace and the files were generating IDE noise against the live frontend codebase.
 
 The current readiness proof is green.
 

@@ -303,8 +303,7 @@ def validate_test_data():
     
     # Check fixture files
     fixture_files = [
-        'backend/services/finance/tests/fixtures.py',
-        'frontend/tests/fixtures/finance-fixtures.ts'
+        'backend/services/finance/tests/fixtures.py'
     ]
     
     for fixture_file in fixture_files:
@@ -317,10 +316,7 @@ def validate_test_data():
     test_files = [
         'backend/services/finance/tests/test_crud.py',
         'backend/services/finance/tests/test_api.py',
-        'backend/services/finance/tests/test_payment_integration.py',
-        'frontend/components/finance/__tests__/FinanceDashboard.test.tsx',
-        'frontend/components/finance/__tests__/InvoiceManagement.test.tsx',
-        'frontend/tests/e2e/payment-flow.spec.ts'
+        'backend/services/finance/tests/test_payment_integration.py'
     ]
     
     for test_file in test_files:

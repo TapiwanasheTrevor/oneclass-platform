@@ -42,7 +42,6 @@
     "**/*.test.tsx",
     "**/*.spec.ts",
     "**/*.spec.tsx",
-    "**/__tests__/**",
-    "vitest.config.ts"
+    "**/__tests__/**"
   ]
 }
