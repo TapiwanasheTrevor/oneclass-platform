@@ -390,10 +390,16 @@ Completed in this pass:
 - Integration routes were rewired from broken `core.*` imports to shared auth/database contracts and now resolve school scope from the actual authenticated user object.
 - `shared.auth` now exposes `require_permissions`, which closes a broken dependency used by integration and domain-management style routes.
 
+Completed in the convergence pass on 2026-04-02:
+
+- Migration services was fully converted from sync `get_db()` / `Session` to async `get_async_session()` / `AsyncSession`, eliminating the async/sync mismatch where `async def` methods performed synchronous database operations.
+- Proper SQLAlchemy ORM models were created for all 8 migration_services schema tables (`CarePackage`, `CarePackageOrder`, `MigrationTask`, `DataSource`, `CommunicationLog`, `MigrationPayment`, `Milestone`, `TeamPerformance`), replacing the empty stub classes that were previously inlined at the bottom of `service.py`.
+- The service layer was rewritten to use SQLAlchemy 2.0 `select()` statements instead of legacy `Query` API.
+- All Pydantic calls were updated from deprecated `.dict()` / `from_orm()` to `.model_dump()` / `.model_validate()`.
+
 Still open in Phase 1:
 
-- Mixed sync SQLAlchemy, async SQLAlchemy, and raw `asyncpg` access is reduced but not fully eliminated across non-auth modules.
-- Finance still uses raw `asyncpg` extensively by design, and migration-services retains older service patterns.
+- Finance core CRUD (`crud.py`, ~16K lines) uses raw `asyncpg` via `get_database_connection()` by design. This is an accepted divergence because the financial SQL is complex and the `DatabaseManager` in `shared.auth` already handles connection pooling and RLS context. The newer finance integration routes (zimbabwe, academic, SIS) already use the canonical `get_async_session()` pattern.
 - Legacy duplicate school-resolution routes were removed in the cleanup pass, leaving `/api/v1/platform/schools/...` as the only supported public school-discovery contract.
 
 ### Phase 2: Frontend Context Unification
@@ -552,7 +558,6 @@ Stable enough to expand on now:
 
 Not yet ready to treat as expansion foundations:
 
-- legacy migration-services backend
 - optional SSO/SAML runtime behavior without third-party packages installed
 
 ### Practical Expansion Rule
