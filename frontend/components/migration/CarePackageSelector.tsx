@@ -495,7 +495,7 @@ export default function CarePackageSelector() {
                   <Checkbox
                     id="urgentMigration"
                     checked={requirements.urgentMigration}
-                    onCheckedChange={(checked) => setRequirements({...requirements, urgentMigration: checked})}
+                    onCheckedChange={(checked) => setRequirements({...requirements, urgentMigration: checked === true})}
                   />
                   <Label htmlFor="urgentMigration">
                     Rush Migration (50% faster completion) - Additional $1,000
@@ -507,7 +507,7 @@ export default function CarePackageSelector() {
                     <Checkbox
                       id="onSiteTraining"
                       checked={requirements.onSiteTraining}
-                      onCheckedChange={(checked) => setRequirements({...requirements, onSiteTraining: checked})}
+                      onCheckedChange={(checked) => setRequirements({...requirements, onSiteTraining: checked === true})}
                     />
                     <Label htmlFor="onSiteTraining">
                       On-site Training (Recommended) - Additional $800
@@ -519,7 +519,7 @@ export default function CarePackageSelector() {
                   <Checkbox
                     id="weekendWork"
                     checked={requirements.weekendWork}
-                    onCheckedChange={(checked) => setRequirements({...requirements, weekendWork: checked})}
+                    onCheckedChange={(checked) => setRequirements({...requirements, weekendWork: checked === true})}
                   />
                   <Label htmlFor="weekendWork">
                     Weekend/Evening Work (Minimize school disruption) - Additional $500

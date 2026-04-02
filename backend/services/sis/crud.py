@@ -3,7 +3,7 @@
 # File: backend/services/sis/crud.py
 # =====================================================
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, and_, or_, func, text
 from sqlalchemy.orm import selectinload, joinedload
 from typing import List, Optional, Dict, Any, Tuple
@@ -32,7 +32,6 @@ from .schemas import (
 )
 
 # User is already imported from shared.models.platform_user above
-from shared.database import get_db_session
 from shared.encryption import encrypt_sensitive_data, decrypt_sensitive_data
 
 logger = logging.getLogger(__name__)
@@ -87,7 +86,7 @@ class StudentCRUD:
 
     @staticmethod
     async def create_student_full_workflow(
-        db: Session,
+        db: AsyncSession,
         student_data: StudentCreate,
         school_id: UUID,
         created_by_user_id: UUID,
@@ -198,7 +197,7 @@ class StudentCRUD:
 
     @staticmethod
     async def get_student_by_id_with_permission_check(
-        db: Session, user: User, student_id: UUID
+        db: AsyncSession, user: User, student_id: UUID
     ) -> Optional[Student]:
         """
         Get student by ID with proper permission checking based on user role.
@@ -237,7 +236,7 @@ class StudentCRUD:
 
     @staticmethod
     async def get_students(
-        db: Session,
+        db: AsyncSession,
         user: User,
         grade_id: Optional[UUID] = None,
         class_id: Optional[UUID] = None,
@@ -298,7 +297,7 @@ class StudentCRUD:
 
     @staticmethod
     async def update_student(
-        db: Session,
+        db: AsyncSession,
         student_id: UUID,
         student_update: StudentUpdate,
         updated_by_user_id: UUID,
@@ -366,7 +365,7 @@ class StudentCRUD:
 
     @staticmethod
     async def delete_student(
-        db: Session,
+        db: AsyncSession,
         student_id: UUID,
         deleted_by_user_id: UUID,
         soft_delete: bool = True,
@@ -420,7 +419,7 @@ class StudentCRUD:
     # =====================================================
 
     @staticmethod
-    async def _validate_class_capacity(db: Session, class_id: UUID):
+    async def _validate_class_capacity(db: AsyncSession, class_id: UUID):
         """Validate that class has capacity for new student."""
         # Query class capacity and current enrollment
         query = text(
@@ -447,7 +446,7 @@ class StudentCRUD:
 
     @staticmethod
     async def _check_duplicate_student(
-        db: Session, student_data: StudentCreate, school_id: UUID
+        db: AsyncSession, student_data: StudentCreate, school_id: UUID
     ):
         """Check for potential duplicate students."""
         # Check for students with same name and date of birth
@@ -470,7 +469,7 @@ class StudentCRUD:
             )
 
     @staticmethod
-    async def _generate_student_number(db: Session, school_id: UUID) -> str:
+    async def _generate_student_number(db: AsyncSession, school_id: UUID) -> str:
         """Generate unique student number for the school."""
         current_year = datetime.now().year
 
@@ -558,7 +557,7 @@ class StudentCRUD:
 
     @staticmethod
     async def _create_initial_academic_history(
-        db: Session, student_id: UUID, school_id: UUID
+        db: AsyncSession, student_id: UUID, school_id: UUID
     ):
         """Create initial academic history record for new student."""
         # Get current academic year
@@ -582,7 +581,7 @@ class StudentCRUD:
 
     @staticmethod
     async def _log_student_activity(
-        db: Session,
+        db: AsyncSession,
         student_id: UUID,
         user_id: UUID,
         action: str,
@@ -605,7 +604,7 @@ class GuardianCRUD:
 
     @staticmethod
     async def create_guardian_relationship(
-        db: Session,
+        db: AsyncSession,
         student_id: UUID,
         guardian_data: GuardianRelationshipCreate,
         created_by_user_id: UUID,
@@ -668,7 +667,7 @@ class GuardianCRUD:
 
     @staticmethod
     async def get_student_guardians(
-        db: Session, student_id: UUID
+        db: AsyncSession, student_id: UUID
     ) -> List[StudentGuardian]:
         """Get all guardians for a student."""
         query = (
@@ -681,7 +680,7 @@ class GuardianCRUD:
         return list(result.scalars().all())
 
     @staticmethod
-    async def _ensure_single_primary_contact(db: Session, student_id: UUID):
+    async def _ensure_single_primary_contact(db: AsyncSession, student_id: UUID):
         """Ensure only one primary contact exists for a student."""
         update_query = (
             update(StudentGuardian)
@@ -701,7 +700,7 @@ class DisciplinaryCRUD:
 
     @staticmethod
     async def create_incident(
-        db: Session,
+        db: AsyncSession,
         incident_data: DisciplinaryIncidentCreate,
         reported_by_user_id: UUID,
     ) -> DisciplinaryIncident:
@@ -749,7 +748,7 @@ class DisciplinaryCRUD:
 
     @staticmethod
     async def _update_student_disciplinary_points(
-        db: Session, student_id: UUID, points_to_add: int
+        db: AsyncSession, student_id: UUID, points_to_add: int
     ):
         """Update student's disciplinary points total."""
         update_query = (
@@ -770,7 +769,7 @@ class AttendanceCRUD:
 
     @staticmethod
     async def mark_attendance(
-        db: Session, attendance_data: AttendanceRecordCreate, marked_by_user_id: UUID
+        db: AsyncSession, attendance_data: AttendanceRecordCreate, marked_by_user_id: UUID
     ) -> AttendanceRecord:
         """Mark student attendance."""
         try:
@@ -826,7 +825,7 @@ class AttendanceCRUD:
 
     @staticmethod
     async def get_student_attendance(
-        db: Session,
+        db: AsyncSession,
         student_id: UUID,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
@@ -856,7 +855,7 @@ class HealthRecordCRUD:
 
     @staticmethod
     async def create_health_record(
-        db: Session, health_data: HealthRecordCreate, created_by_user_id: UUID
+        db: AsyncSession, health_data: HealthRecordCreate, created_by_user_id: UUID
     ) -> HealthRecord:
         """Create a health record for a student."""
         try:
@@ -902,7 +901,7 @@ class DocumentCRUD:
 
     @staticmethod
     async def upload_student_document(
-        db: Session, document_data: StudentDocumentCreate, uploaded_by_user_id: UUID
+        db: AsyncSession, document_data: StudentDocumentCreate, uploaded_by_user_id: UUID
     ) -> StudentDocument:
         """Upload a document for a student."""
         try:

@@ -11,7 +11,8 @@ const MONTHS = [
 ];
 
 export function SchoolOverview() {
-  const school = useSchoolContext();
+  const schoolContext = useSchoolContext();
+  const school = schoolContext.school;
 
   if (!school) {
     return (
@@ -28,24 +29,24 @@ export function SchoolOverview() {
   }
 
   const info = [
-    { icon: School, label: 'School Type', value: school.school.type.charAt(0).toUpperCase() + school.school.type.slice(1) },
-    { icon: Layers, label: 'Terms per Year', value: String(school.academic.terms_per_year) },
-    { icon: Calendar, label: 'Academic Year Starts', value: MONTHS[(school.academic.year_start_month - 1) % 12] },
-    { icon: Globe, label: 'Timezone', value: school.regional.timezone },
+    { icon: School, label: 'School Type', value: school.type.charAt(0).toUpperCase() + school.type.slice(1) },
+    { icon: Layers, label: 'Terms per Year', value: String(schoolContext.academic.terms_per_year) },
+    { icon: Calendar, label: 'Academic Year Starts', value: MONTHS[(schoolContext.academic.year_start_month - 1) % 12] },
+    { icon: Globe, label: 'Timezone', value: schoolContext.regional.timezone },
   ];
 
   return (
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">{school.school.name}</CardTitle>
+          <CardTitle className="text-lg">{school.name}</CardTitle>
           <Badge variant="secondary" className="capitalize">
-            {school.subscription.tier}
+            {schoolContext.subscription.tier}
           </Badge>
         </div>
-        {school.school.config.motto && (
+        {school.config.motto && (
           <p className="text-sm text-muted-foreground italic">
-            &ldquo;{school.school.config.motto}&rdquo;
+            &ldquo;{school.config.motto}&rdquo;
           </p>
         )}
       </CardHeader>

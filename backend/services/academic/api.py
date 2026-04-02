@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Request
 
 # Import database session
-from shared.database import get_db
+from shared.database import get_async_session
 
 # Import authentication and middleware
 from .middleware import (
@@ -173,7 +173,7 @@ router.include_router(calendar_management_router)
 )
 async def create_subject_endpoint(
     subject_data: SubjectCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     auth_context: AcademicAuthContext = Depends(require_subject_write)
 ):
     """Create a new subject"""
@@ -237,7 +237,7 @@ async def get_subjects_endpoint(
     department: Optional[str] = Query(None, description="Filter by academic department"),
     is_core: Optional[bool] = Query(None, description="Filter by core/elective status"),
     search: Optional[str] = Query(None, min_length=2, description="Search by subject name or code"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     auth_context: AcademicAuthContext = Depends(require_subject_read)
 ):
     """Get paginated list of subjects with filtering"""
@@ -273,7 +273,7 @@ async def get_subjects_endpoint(
 @router.get("/subjects/{subject_id}", response_model=Subject)
 async def get_subject_endpoint(
     subject_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     auth_context: AcademicAuthContext = Depends(require_subject_read)
 ):
     """Get a specific subject by ID"""
@@ -298,7 +298,7 @@ async def get_subject_endpoint(
 async def update_subject_endpoint(
     subject_id: UUID,
     subject_data: SubjectUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     auth_context: AcademicAuthContext = Depends(require_subject_write)
 ):
     """Update an existing subject"""
@@ -324,7 +324,7 @@ async def update_subject_endpoint(
 @router.delete("/subjects/{subject_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_subject_endpoint(
     subject_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     auth_context: AcademicAuthContext = Depends(require_subject_write)
 ):
     """Soft delete a subject"""
@@ -360,7 +360,7 @@ async def delete_subject_endpoint(
 @router.post("/assessments", response_model=Assessment, status_code=status.HTTP_201_CREATED)
 async def create_assessment_endpoint(
     assessment_data: AssessmentCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     auth_context: AcademicAuthContext = Depends(require_assessment_write)
 ):
     """Create a new assessment"""
@@ -392,7 +392,7 @@ async def get_assessments_endpoint(
     class_id: Optional[UUID] = Query(None, description="Filter by class"),
     term_number: Optional[TermNumber] = Query(None, description="Filter by term"),
     assessment_type: Optional[AssessmentType] = Query(None, description="Filter by type"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     auth_context: AcademicAuthContext = Depends(get_academic_auth_context)
 ):
     """Get paginated list of assessments with filtering"""
@@ -440,7 +440,7 @@ async def get_assessments_endpoint(
 @router.post("/grades/bulk", response_model=Dict[str, Any])
 async def submit_bulk_grades_endpoint(
     grade_data: BulkGradeCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     auth_context: AcademicAuthContext = Depends(require_grade_write)
 ):
     """Submit grades in bulk for an assessment"""
@@ -484,7 +484,7 @@ async def submit_bulk_grades_endpoint(
 @router.get("/grades/{assessment_id}", response_model=List[Grade])
 async def get_assessment_grades_endpoint(
     assessment_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     auth_context: AcademicAuthContext = Depends(get_academic_auth_context)
 ):
     """Get all grades for a specific assessment"""
@@ -520,7 +520,7 @@ async def get_assessment_grades_endpoint(
 @router.post("/attendance/sessions", response_model=AttendanceSession, status_code=status.HTTP_201_CREATED)
 async def create_attendance_session_endpoint(
     session_data: AttendanceSessionCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     auth_context: AcademicAuthContext = Depends(require_attendance_write)
 ):
     """Create a new attendance session"""
@@ -543,7 +543,7 @@ async def create_attendance_session_endpoint(
 @router.post("/attendance/bulk")
 async def mark_bulk_attendance_endpoint(
     attendance_data: BulkAttendanceCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     auth_context: AcademicAuthContext = Depends(require_attendance_write)
 ):
     """Mark attendance in bulk for a session"""
@@ -569,11 +569,6 @@ async def mark_bulk_attendance_endpoint(
 # =====================================================
 # UTILITY ENDPOINTS
 # =====================================================
-
-@router.get("/health", status_code=status.HTTP_200_OK)
-async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy", "service": "academic-management"}
 
 @router.get("/enums/terms", response_model=List[Dict[str, Any]])
 async def get_terms_enum():

@@ -76,14 +76,14 @@ export default function InvoiceManagement({ academicYearId }: InvoiceManagementP
   const [createForm, setCreateForm] = useState({
     student_id: "",
     fee_structure_id: "",
-    due_date: null as Date | null,
+    due_date: undefined as Date | undefined,
     term_id: "",
     notes: ""
   })
 
   const [bulkForm, setBulkForm] = useState({
     fee_structure_id: "",
-    due_date: null as Date | null,
+    due_date: undefined as Date | undefined,
     term_id: "",
     student_ids: [] as string[],
     grade_levels: [] as number[],
@@ -123,7 +123,7 @@ export default function InvoiceManagement({ academicYearId }: InvoiceManagementP
       setCreateForm({
         student_id: "",
         fee_structure_id: "",
-        due_date: null,
+        due_date: undefined,
         term_id: "",
         notes: ""
       })
@@ -149,7 +149,7 @@ export default function InvoiceManagement({ academicYearId }: InvoiceManagementP
       setShowBulkDialog(false)
       setBulkForm({
         fee_structure_id: "",
-        due_date: null,
+        due_date: undefined,
         term_id: "",
         student_ids: [],
         grade_levels: [],
@@ -364,7 +364,7 @@ export default function InvoiceManagement({ academicYearId }: InvoiceManagementP
                         <Calendar
                           mode="single"
                           selected={bulkForm.due_date}
-                          onSelect={(date) => setBulkForm(prev => ({ ...prev, due_date: date }))}
+                          onSelect={(date) => setBulkForm(prev => ({ ...prev, due_date: date ?? undefined }))}
                           initialFocus
                         />
                       </PopoverContent>
@@ -478,7 +478,7 @@ export default function InvoiceManagement({ academicYearId }: InvoiceManagementP
                       <Calendar
                         mode="single"
                         selected={createForm.due_date}
-                        onSelect={(date) => setCreateForm(prev => ({ ...prev, due_date: date }))}
+                        onSelect={(date) => setCreateForm(prev => ({ ...prev, due_date: date ?? undefined }))}
                         initialFocus
                       />
                     </PopoverContent>

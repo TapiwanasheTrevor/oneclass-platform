@@ -709,7 +709,7 @@ export default function TimetableManagement({ academicYearId, className }: Timet
                     </div>
                   ))}
                 </div>
-              ) : periods?.items?.length > 0 ? (
+              ) : (periods?.items?.length ?? 0) > 0 ? (
                 renderPeriodsTable()
               ) : (
                 <div className="text-center py-8">

@@ -21,11 +21,39 @@ const steps = [
   { id: 5, title: "Confirmation", description: "Review and confirm setup" },
 ]
 
+interface OnboardingFormData {
+  schoolName: string
+  schoolType: string
+  address: string
+  city: string
+  province: string
+  phone: string
+  email: string
+  website: string
+  establishedYear: string
+  studentCount: string
+  adminFirstName: string
+  adminLastName: string
+  adminEmail: string
+  adminPhone: string
+  adminPassword: string
+  adminConfirmPassword: string
+  academicYear: string
+  termStructure: string
+  gradeStructure: string
+  subjects: string[]
+  selectedPlan: string
+  billingCycle: string
+}
+
+type OnboardingField = keyof OnboardingFormData
+type OnboardingErrors = Partial<Record<OnboardingField, string>>
+
 export default function OnboardingPage() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
-  const [errors, setErrors] = useState({})
-  const [formData, setFormData] = useState({
+  const [errors, setErrors] = useState<OnboardingErrors>({})
+  const [formData, setFormData] = useState<OnboardingFormData>({
     // School Information
     schoolName: "",
     schoolType: "",
@@ -57,7 +85,7 @@ export default function OnboardingPage() {
     billingCycle: "monthly",
   })
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: OnboardingField, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
     
     // Clear error when user starts typing
@@ -67,7 +95,7 @@ export default function OnboardingPage() {
   }
 
   const validateStep = (step: number) => {
-    const stepErrors = {}
+    const stepErrors: OnboardingErrors = {}
     
     switch (step) {
       case 1: // School Information

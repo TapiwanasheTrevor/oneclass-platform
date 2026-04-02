@@ -9,11 +9,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.database import get_db
-from core.auth import get_current_user, require_permissions
-from core.exceptions import NotFoundError, ValidationError
-from core.models import User
-from core.pagination import PaginationParams, PaginatedResponse
+from shared.database import get_async_session
+from shared.auth import get_current_user, require_permissions
+from shared.exceptions import NotFoundError, ValidationError
+from shared.models.platform_user import PlatformUser as User
 
 from .academic_sis_integration import AcademicSISIntegration, get_academic_sis_integration
 from .academic_finance_integration import AcademicFinanceIntegration, get_academic_finance_integration
@@ -21,6 +20,12 @@ from ..academic.schemas import StudentPerformance, AttendanceStats
 from ..sis.schemas import StudentWithDetails
 
 router = APIRouter(prefix="/api/v1/integration", tags=["integration"])
+
+
+def _get_effective_school_id(current_user: User):
+    return getattr(current_user, "school_id", None) or getattr(
+        current_user, "primary_school_id", None
+    )
 
 # =====================================================
 # ACADEMIC-SIS INTEGRATION ENDPOINTS
@@ -30,7 +35,7 @@ router = APIRouter(prefix="/api/v1/integration", tags=["integration"])
 async def get_class_students_for_academic(
     class_id: UUID,
     academic_year_id: UUID = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user)
 ) -> List[StudentWithDetails]:
     """Get all students in a class for academic operations"""
@@ -40,7 +45,7 @@ async def get_class_students_for_academic(
         integration = await get_academic_sis_integration(db)
         students = await integration.get_class_students_for_academic(
             class_id=class_id,
-            school_id=current_user.school_id,
+            school_id=_get_effective_school_id(current_user),
             academic_year_id=academic_year_id
         )
         
@@ -63,7 +68,7 @@ async def get_student_academic_performance(
     student_id: UUID,
     academic_year_id: UUID = Query(...),
     term_number: Optional[int] = Query(None, ge=1, le=3),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user)
 ) -> StudentPerformance:
     """Get comprehensive academic performance for a student"""
@@ -73,7 +78,7 @@ async def get_student_academic_performance(
         integration = await get_academic_sis_integration(db)
         performance = await integration.get_student_academic_performance(
             student_id=student_id,
-            school_id=current_user.school_id,
+            school_id=_get_effective_school_id(current_user),
             academic_year_id=academic_year_id,
             term_number=term_number
         )
@@ -97,7 +102,7 @@ async def get_student_attendance_stats(
     student_id: UUID,
     academic_year_id: UUID = Query(...),
     term_number: Optional[int] = Query(None, ge=1, le=3),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user)
 ) -> AttendanceStats:
     """Get attendance statistics for a student"""
@@ -107,7 +112,7 @@ async def get_student_attendance_stats(
         integration = await get_academic_sis_integration(db)
         stats = await integration.get_student_attendance_stats(
             student_id=student_id,
-            school_id=current_user.school_id,
+            school_id=_get_effective_school_id(current_user),
             academic_year_id=academic_year_id,
             term_number=term_number
         )
@@ -126,7 +131,7 @@ async def get_class_academic_summary(
     class_id: UUID,
     academic_year_id: UUID = Query(...),
     term_number: Optional[int] = Query(None, ge=1, le=3),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """Get comprehensive academic summary for a class"""
@@ -136,7 +141,7 @@ async def get_class_academic_summary(
         integration = await get_academic_sis_integration(db)
         summary = await integration.get_class_academic_summary(
             class_id=class_id,
-            school_id=current_user.school_id,
+            school_id=_get_effective_school_id(current_user),
             academic_year_id=academic_year_id,
             term_number=term_number
         )
@@ -158,7 +163,7 @@ async def get_class_academic_summary(
 @router.get("/academic/student/{student_id}/guardians")
 async def get_student_guardians_for_notifications(
     student_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user)
 ) -> List[Dict[str, Any]]:
     """Get guardian information for academic notifications"""
@@ -168,7 +173,7 @@ async def get_student_guardians_for_notifications(
         integration = await get_academic_sis_integration(db)
         guardians = await integration.get_student_guardians_for_notifications(
             student_id=student_id,
-            school_id=current_user.school_id
+            school_id=_get_effective_school_id(current_user)
         )
         
         return guardians
@@ -189,7 +194,7 @@ async def check_student_subject_access(
     student_id: UUID,
     subject_id: UUID,
     academic_year_id: UUID = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """Check if student has paid required fees to access subject"""
@@ -200,7 +205,7 @@ async def check_student_subject_access(
         access_info = await integration.check_student_subject_access(
             student_id=student_id,
             subject_id=subject_id,
-            school_id=current_user.school_id,
+            school_id=_get_effective_school_id(current_user),
             academic_year_id=academic_year_id
         )
         
@@ -222,7 +227,7 @@ async def check_student_subject_access(
 async def check_student_assessment_access(
     student_id: UUID,
     assessment_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """Check if student can take assessment based on payment status"""
@@ -233,7 +238,7 @@ async def check_student_assessment_access(
         access_info = await integration.check_student_assessment_access(
             student_id=student_id,
             assessment_id=assessment_id,
-            school_id=current_user.school_id
+            school_id=_get_effective_school_id(current_user)
         )
         
         return access_info
@@ -255,7 +260,7 @@ async def generate_subject_enrollment_invoice(
     student_id: UUID,
     subject_id: UUID,
     academic_year_id: UUID = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """Generate invoice for subject-specific fees when student enrolls"""
@@ -266,7 +271,7 @@ async def generate_subject_enrollment_invoice(
         invoice_info = await integration.generate_subject_enrollment_invoice(
             student_id=student_id,
             subject_id=subject_id,
-            school_id=current_user.school_id,
+            school_id=_get_effective_school_id(current_user),
             academic_year_id=academic_year_id,
             created_by=current_user.id
         )
@@ -298,7 +303,7 @@ async def process_resource_usage_billing(
     resource_id: UUID,
     usage_amount: float,
     academic_year_id: UUID = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """Process billing for resource usage (lab materials, equipment, etc.)"""
@@ -312,7 +317,7 @@ async def process_resource_usage_billing(
             resource_type=resource_type,
             resource_id=resource_id,
             usage_amount=Decimal(str(usage_amount)),
-            school_id=current_user.school_id,
+            school_id=_get_effective_school_id(current_user),
             academic_year_id=academic_year_id,
             created_by=current_user.id
         )
@@ -336,7 +341,7 @@ async def process_resource_usage_billing(
 async def get_academic_financial_summary(
     academic_year_id: UUID = Query(...),
     term_number: Optional[int] = Query(None, ge=1, le=3),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """Get financial summary related to academic activities"""
@@ -345,7 +350,7 @@ async def get_academic_financial_summary(
         
         integration = await get_academic_finance_integration(db)
         summary = await integration.get_academic_financial_summary(
-            school_id=current_user.school_id,
+            school_id=_get_effective_school_id(current_user),
             academic_year_id=academic_year_id,
             term_number=term_number
         )
@@ -363,7 +368,7 @@ async def get_academic_financial_summary(
 async def get_students_with_payment_restrictions(
     class_id: UUID,
     academic_year_id: UUID = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user)
 ) -> List[Dict[str, Any]]:
     """Get students who have academic restrictions due to unpaid fees"""
@@ -373,7 +378,7 @@ async def get_students_with_payment_restrictions(
         integration = await get_academic_finance_integration(db)
         restricted_students = await integration.get_students_with_payment_restrictions(
             class_id=class_id,
-            school_id=current_user.school_id,
+            school_id=_get_effective_school_id(current_user),
             academic_year_id=academic_year_id
         )
         
@@ -401,7 +406,7 @@ async def validate_student_enrollment_for_academic(
     class_id: UUID = Query(...),
     subject_id: UUID = Query(...),
     academic_year_id: UUID = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, bool]:
     """Validate if student is properly enrolled for academic operations"""
@@ -430,7 +435,7 @@ async def validate_student_academic_access(
     student_id: UUID,
     subject_id: UUID = Query(...),
     academic_year_id: UUID = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, bool]:
     """Quick validation for student academic access based on payment status"""
@@ -442,7 +447,7 @@ async def validate_student_academic_access(
             db=db,
             student_id=student_id,
             subject_id=subject_id,
-            school_id=current_user.school_id,
+            school_id=_get_effective_school_id(current_user),
             academic_year_id=academic_year_id
         )
         
@@ -463,7 +468,7 @@ async def validate_student_academic_access(
 async def sync_class_enrollment_with_academic(
     class_id: UUID,
     academic_year_id: UUID = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """Sync class enrollment data with academic operations"""
@@ -475,7 +480,7 @@ async def sync_class_enrollment_with_academic(
             db=db,
             class_id=class_id,
             academic_year_id=academic_year_id,
-            school_id=current_user.school_id
+            school_id=_get_effective_school_id(current_user)
         )
         
         return sync_result

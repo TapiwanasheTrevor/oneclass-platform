@@ -16,30 +16,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 
-import { usePermissions, PlatformUser, SchoolRole, UserStatus } from '@/hooks/useAuth';
-
-interface SchoolMembership {
-  school_id: string;
-  school_name: string;
-  school_subdomain: string;
-  role: SchoolRole;
-  permissions: string[];
-  joined_date: string;
-  status: UserStatus;
-  
-  // Role-specific fields
-  student_id?: string;
-  current_grade?: string;
-  admission_date?: string;
-  graduation_date?: string;
-  
-  employee_id?: string;
-  department?: string;
-  hire_date?: string;
-  contract_type?: string;
-  
-  children_ids?: string[];
-}
+import {
+  usePermissions,
+  PlatformUser,
+  SchoolRole,
+  MembershipStatus,
+  type SchoolMembership,
+} from '@/hooks/useAuth';
 
 interface School {
   id: string;
@@ -70,7 +53,7 @@ export const SchoolMembershipManager: React.FC<SchoolMembershipManagerProps> = (
   // New membership form state
   const [newMembership, setNewMembership] = useState<Partial<SchoolMembership>>({
     role: SchoolRole.STUDENT,
-    status: UserStatus.ACTIVE,
+    status: MembershipStatus.ACTIVE,
     permissions: [],
   });
 
@@ -98,7 +81,7 @@ export const SchoolMembershipManager: React.FC<SchoolMembershipManagerProps> = (
   };
 
   const getDefaultPermissionsForRole = (role: SchoolRole): string[] => {
-    const rolePermissions: Record<SchoolRole, string[]> = {
+    const rolePermissions: Partial<Record<SchoolRole, string[]>> = {
       [SchoolRole.PRINCIPAL]: ['*'],
       [SchoolRole.DEPUTY_PRINCIPAL]: ['users.manage', 'academics.manage', 'reports.view'],
       [SchoolRole.ACADEMIC_HEAD]: ['academics.manage', 'reports.view', 'students.manage'],
@@ -114,7 +97,7 @@ export const SchoolMembershipManager: React.FC<SchoolMembershipManagerProps> = (
       [SchoolRole.STUDENT]: ['academics.view', 'assignments.submit', 'resources.access'],
     };
     
-    return rolePermissions[role] || [];
+    return rolePermissions[role] ?? [];
   };
 
   const handleAddMembership = async () => {
@@ -157,7 +140,7 @@ export const SchoolMembershipManager: React.FC<SchoolMembershipManagerProps> = (
       setShowAddMembership(false);
       setNewMembership({
         role: SchoolRole.STUDENT,
-        status: UserStatus.ACTIVE,
+        status: MembershipStatus.ACTIVE,
         permissions: [],
       });
       
@@ -232,7 +215,7 @@ export const SchoolMembershipManager: React.FC<SchoolMembershipManagerProps> = (
   };
 
   const getRoleColor = (role: SchoolRole): string => {
-    const colors: Record<SchoolRole, string> = {
+    const colors: Partial<Record<SchoolRole, string>> = {
       [SchoolRole.PRINCIPAL]: 'bg-purple-100 text-purple-800',
       [SchoolRole.DEPUTY_PRINCIPAL]: 'bg-indigo-100 text-indigo-800',
       [SchoolRole.ACADEMIC_HEAD]: 'bg-blue-100 text-blue-800',
@@ -247,16 +230,16 @@ export const SchoolMembershipManager: React.FC<SchoolMembershipManagerProps> = (
       [SchoolRole.PARENT]: 'bg-yellow-100 text-yellow-800',
       [SchoolRole.STUDENT]: 'bg-orange-100 text-orange-800',
     };
-    return colors[role] || 'bg-gray-100 text-gray-800';
+    return colors[role] ?? 'bg-gray-100 text-gray-800';
   };
 
-  const getStatusColor = (status: UserStatus): string => {
-    const colors: Record<UserStatus, string> = {
-      [UserStatus.ACTIVE]: 'bg-green-100 text-green-800',
-      [UserStatus.INACTIVE]: 'bg-gray-100 text-gray-800',
-      [UserStatus.SUSPENDED]: 'bg-red-100 text-red-800',
-      [UserStatus.PENDING_VERIFICATION]: 'bg-yellow-100 text-yellow-800',
-      [UserStatus.ARCHIVED]: 'bg-slate-100 text-slate-800',
+  const getStatusColor = (status: MembershipStatus): string => {
+    const colors: Record<MembershipStatus, string> = {
+      [MembershipStatus.ACTIVE]: 'bg-green-100 text-green-800',
+      [MembershipStatus.INACTIVE]: 'bg-gray-100 text-gray-800',
+      [MembershipStatus.SUSPENDED]: 'bg-red-100 text-red-800',
+      [MembershipStatus.PENDING]: 'bg-yellow-100 text-yellow-800',
+      [MembershipStatus.ARCHIVED]: 'bg-slate-100 text-slate-800',
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
@@ -527,14 +510,14 @@ export const SchoolMembershipManager: React.FC<SchoolMembershipManagerProps> = (
                   value={editingMembership.status} 
                   onValueChange={(value) => setEditingMembership(prev => prev ? { 
                     ...prev, 
-                    status: value as UserStatus 
+                    status: value as MembershipStatus 
                   } : null)}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.values(UserStatus).map((status) => (
+                    {Object.values(MembershipStatus).map((status) => (
                       <SelectItem key={status} value={status}>
                         {status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                       </SelectItem>

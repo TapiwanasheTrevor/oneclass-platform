@@ -38,6 +38,13 @@ class ConflictError(OneClassError):
         super().__init__(message=message, code="CONFLICT")
 
 
+class ExternalServiceError(OneClassError):
+    """Raised when a third-party or external dependency fails."""
+
+    def __init__(self, message: str = "External service failure"):
+        super().__init__(message=message, code="EXTERNAL_SERVICE_ERROR")
+
+
 class AuthenticationError(OneClassError):
     """Raised when authentication fails."""
 

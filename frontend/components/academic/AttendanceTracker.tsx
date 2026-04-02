@@ -39,6 +39,7 @@ import { format } from "date-fns"
 
 import { 
   useAcademicHooks,
+  SessionType,
   type AttendanceSession,
   type AttendanceRecord,
   zimbabweTerms,
@@ -136,7 +137,7 @@ export default function AttendanceTracker({
       const session = await createSessionMutation.mutateAsync({
         timetable_id: `${classId}-${subjectId}`, // Mock timetable ID
         session_date: selectedDate,
-        session_type: selectedSessionType
+        session_type: selectedSessionType as SessionType
       })
       
       setIsSessionDialogOpen(false)

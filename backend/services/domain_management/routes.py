@@ -7,9 +7,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.database import get_db_session
 from shared.auth import get_current_user, require_permissions
-from shared.models.platform import 
 from shared.models.platform_user import PlatformUser as User
 from shared.exceptions import (
     ValidationError,

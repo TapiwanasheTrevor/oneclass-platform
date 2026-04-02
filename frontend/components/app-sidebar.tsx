@@ -210,10 +210,10 @@ export function AppSidebar() {
           />
           <div className="flex flex-col">
             <span className="text-sm font-semibold">
-              {schoolContext?.school.name || "OneClass Platform"}
+              {schoolContext?.school?.name || "OneClass Platform"}
             </span>
             <span className="text-xs text-muted-foreground">
-              {schoolContext?.school.type ? `${schoolContext.school.type} School` : "School Management"}
+              {schoolContext?.school?.type ? `${schoolContext.school.type} School` : "School Management"}
             </span>
           </div>
         </div>

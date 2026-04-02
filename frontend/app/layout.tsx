@@ -1,6 +1,5 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
 import "./globals.css"
 
 export const dynamic = 'force-dynamic'
@@ -11,13 +10,10 @@ import { LayoutContent } from "@/components/layout/LayoutContent"
 import { ErrorBoundary } from "@/components/ui/error-boundary"
 import { TenantProvider, TenantErrorBoundary } from "@/components/tenant/TenantProvider"
 
-
-const inter = Inter({ subsets: ["latin"] })
-
 export const metadata: Metadata = {
   title: "OneClass - School Management Platform",
   description: "Comprehensive school management system for Zimbabwean schools",
-  generator: 'v0.dev'
+  generator: 'OneClass Platform'
 }
 
 export default function RootLayout({
@@ -27,7 +23,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className="min-h-screen font-sans">
         <ErrorBoundary>
           <QueryClientProvider>
             <ClerkProvider>

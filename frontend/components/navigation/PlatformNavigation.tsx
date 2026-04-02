@@ -6,7 +6,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAuth, useSchoolContext, GlobalRole, SchoolRole } from '@/hooks/useAuth';
+import { useAuth, GlobalRole, SchoolRole } from '@/hooks/useAuth';
+import { useSchoolContext } from '@/hooks/useSchoolContext';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   Bell,

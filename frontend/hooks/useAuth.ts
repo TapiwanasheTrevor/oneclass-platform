@@ -9,7 +9,8 @@
 import { useUser, useAuth as useClerkAuthHook } from '@clerk/nextjs';
 import { api, setAuthTokenGetter, setCurrentSchoolId } from '@/lib/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
+import { buildSchoolUrl, getCurrentSubdomain } from '@/utils/subdomain';
 
 // ---- Enums (aligned with backend) ----
 
@@ -67,7 +68,7 @@ export interface SchoolMembership {
   role: SchoolRole;
   permissions: string[];
   status: MembershipStatus;
-  joined_date?: string;
+  joined_date: string;
 
   // Role-specific
   student_id?: string;
@@ -82,17 +83,33 @@ export interface SchoolMembership {
 export interface PlatformUser {
   id: string;
   email: string;
+  school_id?: string;
+  school_name?: string;
+  token?: string;
   first_name: string;
   last_name: string;
-  display_name: string;
-  global_role: GlobalRole;
+  full_name?: string;
+  display_name?: string;
+  platform_role?: GlobalRole | string;
+  global_role: GlobalRole | string;
+  role?: string;
   status: UserStatus;
   primary_school_id?: string;
+  current_school_id?: string;
   school_memberships: SchoolMembership[];
   clerk_user_id?: string;
   is_email_verified: boolean;
   last_login_at?: string;
   login_count: number;
+  profile?: Record<string, any>;
+  current_school?: {
+    school_id: string;
+    school_name: string;
+    school_subdomain: string;
+    subdomain?: string;
+    subscription_tier?: string;
+    role?: string;
+  } | null;
   contact_information?: Record<string, any>;
   personal_profile?: Record<string, any>;
   user_preferences?: Record<string, any>;
@@ -106,6 +123,7 @@ export interface AuthContextType {
   // Platform user (from backend /auth/me)
   user: PlatformUser | null;
   isLoading: boolean;
+  loading: boolean;
   isAuthenticated: boolean;
 
   // School context
@@ -146,19 +164,13 @@ export function useAuth(): AuthContextType {
   const isLoaded = clerkConfigured ? clerkLoaded : true;
   const isSignedIn = clerkConfigured ? !!clerkSignedIn : !!(typeof window !== 'undefined' && localStorage.getItem('auth_token'));
 
-  // Wire up the API client's token getter (once)
-  const tokenGetterSet = useRef(false);
+  // Wire up the API client's token getter.
   useEffect(() => {
-    if (clerkConfigured && !tokenGetterSet.current) {
+    if (clerkConfigured) {
       setAuthTokenGetter(() => getToken());
-      tokenGetterSet.current = true;
+    } else {
+      setAuthTokenGetter(null);
     }
-    return () => {
-      if (tokenGetterSet.current) {
-        setAuthTokenGetter(null);
-        tokenGetterSet.current = false;
-      }
-    };
   }, [clerkConfigured, getToken]);
 
   // Fetch platform user from backend
@@ -185,9 +197,9 @@ export function useAuth(): AuthContextType {
   const currentSchool = useMemo(() => {
     if (!user) return null;
     const active = user.school_memberships.filter(m => m.status === MembershipStatus.ACTIVE);
-    // 1. stored selection, 2. primary, 3. first active
-    return active.find(m => m.school_id === storedSchoolId)
-      || active.find(m => m.school_id === user.primary_school_id)
+    const preferredSchoolId = storedSchoolId || user.current_school_id || user.primary_school_id;
+    // 1. stored selection, 2. backend session/current school, 3. primary, 4. first active
+    return active.find(m => m.school_id === preferredSchoolId)
       || active[0]
       || null;
   }, [user, storedSchoolId]);
@@ -204,13 +216,42 @@ export function useAuth(): AuthContextType {
 
   // Switch school
   const switchSchool = useCallback(async (schoolId: string) => {
-    if (!user?.school_memberships.some(m => m.school_id === schoolId)) return;
+    const targetSchool = user?.school_memberships.find(m => m.school_id === schoolId);
+    if (!targetSchool) return;
+
     try {
       const resp = await api.post('/api/v1/auth/switch-school', { school_id: schoolId });
-      const { current_school } = resp.data || {};
+      const { access_token, current_school } = resp.data || {};
       const newSchoolId = current_school?.school_id || schoolId;
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('current_school_id', newSchoolId);
+        if (access_token) {
+          localStorage.setItem('auth_token', access_token);
+        }
+      }
+
       setCurrentSchoolId(newSchoolId);
-      await queryClient.invalidateQueries();
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['platform-user'] }),
+        queryClient.invalidateQueries({ queryKey: ['school-context'] }),
+        queryClient.invalidateQueries({ queryKey: ['school-config'] }),
+      ]);
+
+      const targetSubdomain =
+        current_school?.school_subdomain ||
+        current_school?.subdomain ||
+        targetSchool.school_subdomain;
+      const currentSubdomain = getCurrentSubdomain();
+
+      if (
+        typeof window !== 'undefined' &&
+        targetSubdomain &&
+        targetSubdomain !== currentSubdomain
+      ) {
+        window.location.href = buildSchoolUrl(targetSubdomain, window.location.pathname);
+      }
     } catch (e) {
       console.error('Failed to switch school', e);
     }
@@ -218,6 +259,12 @@ export function useAuth(): AuthContextType {
 
   // Sign out
   const signOut = useCallback(async () => {
+    try {
+      await api.post('/api/v1/auth/logout');
+    } catch (e) {
+      console.error('Backend sign out error:', e);
+    }
+
     try {
       if (clerkConfigured) {
         await clerkSignOut();
@@ -276,6 +323,7 @@ export function useAuth(): AuthContextType {
     isSignedIn,
     user,
     isLoading,
+    loading: isLoading,
     isAuthenticated: !!user,
     currentSchool,
     availableSchools,
@@ -302,21 +350,6 @@ export function usePermissions() {
     canManageFinance: (schoolId?: string) => hasPermission('finance.manage', schoolId) || hasRole(SchoolRole.BURSAR, schoolId),
     canViewReports: (schoolId?: string) => hasPermission('reports.view', schoolId) || isSchoolAdmin(schoolId),
     canManageSettings: (schoolId?: string) => hasPermission('settings.manage', schoolId) || isSchoolAdmin(schoolId),
-  };
-}
-
-export function useSchoolContext() {
-  const { user, currentSchool, switchSchool, availableSchools } = useAuth();
-
-  return {
-    currentSchool,
-    availableSchools,
-    switchSchool,
-    hasMultipleSchools: availableSchools.length > 1,
-    getCurrentSchoolId: () => currentSchool?.school_id,
-    getCurrentSchoolName: () => currentSchool?.school_name,
-    getUserRoleInCurrentSchool: () => currentSchool?.role,
-    getUserPermissionsInCurrentSchool: () => currentSchool?.permissions || [],
   };
 }
 

@@ -16,7 +16,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 
-import { useAuth, usePermissions, useSchoolContext } from '@/hooks/useAuth';
+import { useAuth, usePermissions } from '@/hooks/useAuth';
+import { useSchoolContext } from '@/hooks/useSchoolContext';
 import { UserCreateForm } from './UserCreateForm';
 import { UserInviteForm } from './UserInviteForm';
 import { BulkImportDialog } from './BulkImportDialog';
@@ -745,7 +746,9 @@ export const UserManagement: React.FC = () => {
               </DialogHeader>
               <UserProfileDialog
                 user={selectedUser}
-                onUpdate={(updates) => handleUserUpdate(selectedUser.id, updates)}
+                onUpdate={(updates: Partial<PlatformUserData>) =>
+                  handleUserUpdate(selectedUser.id, updates)
+                }
                 onClose={() => setShowProfile(false)}
               />
             </DialogContent>

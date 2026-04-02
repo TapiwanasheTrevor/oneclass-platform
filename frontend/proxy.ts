@@ -1,12 +1,10 @@
 /**
- * Next.js Middleware for Multi-Tenant Subdomain Routing
- * Integrates Clerk authentication with school-based multi-tenancy
+ * Next.js Proxy for Multi-Tenant Subdomain Routing
+ * Integrates Clerk authentication with school-based multi-tenancy.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
-
-// ---- Types ----
+import { clerkMiddleware } from '@clerk/nextjs/server'
 
 interface SchoolInfo {
   id: string
@@ -32,8 +30,6 @@ interface UserContext {
     status: string
   }>
 }
-
-// ---- Configuration ----
 
 const PUBLIC_ROUTES = [
   '/',
@@ -76,8 +72,6 @@ const ROLE_DASHBOARDS: Record<string, string> = {
   parent: '/parent',
 }
 
-// ---- Helpers ----
-
 function extractSubdomain(hostname: string): string | null {
   const cleanHostname = hostname.split(':')[0]
 
@@ -106,7 +100,7 @@ function extractSubdomain(hostname: string): string | null {
 async function getSchoolBySubdomain(subdomain: string): Promise<SchoolInfo | null> {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-    const response = await fetch(`${apiUrl}/api/v1/schools/by-subdomain/${subdomain}`, {
+    const response = await fetch(`${apiUrl}/api/v1/platform/schools/by-subdomain/${subdomain}`, {
       headers: { 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(5000),
     })
@@ -177,9 +171,7 @@ function isClerkConfigured(): boolean {
   return !!key && !key.includes('your-') && key.startsWith('pk_')
 }
 
-// ---- Dev middleware (no Clerk) ----
-
-async function devMiddleware(request: NextRequest): Promise<NextResponse> {
+async function devProxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl
 
   if (pathname.startsWith('/_next/') || pathname.startsWith('/api/health') || pathname === '/favicon.ico') {
@@ -189,28 +181,21 @@ async function devMiddleware(request: NextRequest): Promise<NextResponse> {
   return NextResponse.next()
 }
 
-// ---- Clerk middleware ----
-
-const isPublicRouteMatcher = createRouteMatcher(PUBLIC_ROUTES)
-
-const clerkAuthMiddleware = clerkMiddleware(async (auth, request: NextRequest) => {
+const clerkAuthProxy = clerkMiddleware(async (auth, request: NextRequest) => {
   const { pathname } = request.nextUrl
   const hostname = request.headers.get('host') || 'localhost'
 
-  // Skip internal routes
   if (pathname.startsWith('/_next/') || pathname.startsWith('/api/health') || pathname === '/favicon.ico') {
     return NextResponse.next()
   }
 
   const subdomain = extractSubdomain(hostname)
 
-  // No subdomain — root domain handling
   if (!subdomain) {
     if (isAdminRoute(pathname) || pathname === '/' || isPublicRoute(pathname)) {
       return NextResponse.next()
     }
 
-    // Authenticated routes on root domain — let Clerk protect
     const { userId } = await auth()
     if (!userId) {
       return NextResponse.redirect(new URL('/sign-in', request.url))
@@ -219,7 +204,6 @@ const clerkAuthMiddleware = clerkMiddleware(async (auth, request: NextRequest) =
     return NextResponse.next()
   }
 
-  // Has subdomain — resolve school
   const school = await getSchoolBySubdomain(subdomain)
 
   if (!school) {
@@ -230,13 +214,11 @@ const clerkAuthMiddleware = clerkMiddleware(async (auth, request: NextRequest) =
     return NextResponse.redirect(new URL('/tenant-suspended', request.url))
   }
 
-  // Public routes — pass through with school headers
   if (isPublicRoute(pathname)) {
     const response = NextResponse.next()
     return addSchoolHeaders(response, school)
   }
 
-  // Protected route — require Clerk auth
   const { userId, getToken } = await auth()
 
   if (!userId) {
@@ -245,7 +227,6 @@ const clerkAuthMiddleware = clerkMiddleware(async (auth, request: NextRequest) =
     return NextResponse.redirect(loginUrl)
   }
 
-  // Get user's school context from backend
   const token = await getToken()
   const userCtx = token ? await getUserContext(token) : null
 
@@ -253,7 +234,6 @@ const clerkAuthMiddleware = clerkMiddleware(async (auth, request: NextRequest) =
     return NextResponse.redirect(new URL('/user-not-found', request.url))
   }
 
-  // Check user has membership at this school
   const membership = userCtx.school_memberships?.find(
     (m) => m.school_id === school.id && m.status === 'active'
   )
@@ -262,13 +242,11 @@ const clerkAuthMiddleware = clerkMiddleware(async (auth, request: NextRequest) =
     return NextResponse.redirect(new URL('/unauthorized?error=no_school_access', request.url))
   }
 
-  // Root path redirect based on role
   if (pathname === '/') {
     const role = membership?.role || userCtx.role
     return NextResponse.redirect(new URL(getRoleDashboard(role), request.url))
   }
 
-  // Admin route check
   if (isAdminRoute(pathname)) {
     const role = membership?.role || userCtx.role
     const adminRoles = ['super_admin', 'platform_admin', 'principal', 'deputy_principal', 'school_admin']
@@ -277,21 +255,15 @@ const clerkAuthMiddleware = clerkMiddleware(async (auth, request: NextRequest) =
     }
   }
 
-  // Pass through with context headers
   const response = NextResponse.next()
   return addSchoolHeaders(response, school, userCtx)
-}, {
-  publicRoutes: PUBLIC_ROUTES,
-  ignoredRoutes: ['/api/webhooks/(.*)'],
 })
 
-// ---- Main middleware ----
-
-export default function middleware(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   if (isClerkConfigured()) {
-    return clerkAuthMiddleware(request, {} as any)
+    return clerkAuthProxy(request, {} as any)
   }
-  return devMiddleware(request)
+  return devProxy(request)
 }
 
 export const config = {

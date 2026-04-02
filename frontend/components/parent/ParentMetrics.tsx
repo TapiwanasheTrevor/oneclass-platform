@@ -13,12 +13,21 @@ const fallbackData = {
   outstanding_fees: 0,
 };
 
-const metricCards = [
+interface MetricCardConfig {
+  key: keyof typeof fallbackData;
+  label: string;
+  icon: typeof Users;
+  color: string;
+  suffix?: string;
+  prefix?: string;
+}
+
+const metricCards: MetricCardConfig[] = [
   { key: 'num_children', label: 'Children Enrolled', icon: Users, color: 'text-blue-600 bg-blue-100' },
   { key: 'avg_attendance', label: 'Avg Attendance', icon: CalendarCheck, color: 'text-green-600 bg-green-100', suffix: '%' },
   { key: 'avg_grade', label: 'Average Grade', icon: GraduationCap, color: 'text-purple-600 bg-purple-100', suffix: '%' },
   { key: 'outstanding_fees', label: 'Outstanding Fees', icon: DollarSign, color: 'text-amber-600 bg-amber-100', prefix: '$' },
-] as const;
+];
 
 export function ParentMetrics() {
   const { user } = useAuth();

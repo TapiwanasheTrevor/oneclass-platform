@@ -449,16 +449,16 @@ export default function TeacherDashboard({
         <div className="space-y-3">
           {mockUpcomingSessions.slice(0, 5).map((session) => {
             const sessionDate = new Date(session.date)
-            const isToday = isToday(sessionDate)
-            const isTomorrow = isTomorrow(sessionDate)
+            const sessionIsToday = isToday(sessionDate)
+            const sessionIsTomorrow = isTomorrow(sessionDate)
             
             return (
               <div key={session.id} className={`flex items-center justify-between p-3 border rounded-lg ${
-                isToday ? 'bg-blue-50 border-blue-200' : ''
+                sessionIsToday ? 'bg-blue-50 border-blue-200' : ''
               }`}>
                 <div className="flex items-center space-x-3">
                   <div className={`p-2 rounded-full ${
-                    isToday ? 'bg-blue-100' : 'bg-muted'
+                    sessionIsToday ? 'bg-blue-100' : 'bg-muted'
                   }`}>
                     {getSessionTypeIcon(session.type)}
                   </div>
@@ -477,8 +477,8 @@ export default function TeacherDashboard({
                   </div>
                 </div>
                 <div className="text-right">
-                  <Badge variant={isToday ? "default" : "outline"}>
-                    {isToday ? "Today" : isTomorrow ? "Tomorrow" : format(sessionDate, 'MMM dd')}
+                  <Badge variant={sessionIsToday ? "default" : "outline"}>
+                    {sessionIsToday ? "Today" : sessionIsTomorrow ? "Tomorrow" : format(sessionDate, 'MMM dd')}
                   </Badge>
                   <div className="text-xs text-muted-foreground mt-1 capitalize">
                     {session.type} session

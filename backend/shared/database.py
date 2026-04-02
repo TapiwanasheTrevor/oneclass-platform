@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker as async_sessionmaker
 from sqlalchemy import text
 from contextvars import ContextVar
+from contextlib import asynccontextmanager
 import logging
 
 logger = logging.getLogger(__name__)
@@ -188,10 +189,26 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
             await _reset_rls_context(session)
 
 
+@asynccontextmanager
+async def get_async_db_session() -> AsyncGenerator[AsyncSession, None]:
+    """Context-manager form of the async session helper for service-layer use."""
+    async with AsyncSessionLocal() as session:
+        school_id = get_current_school_id()
+        await _apply_rls_context(session, school_id)
+        try:
+            yield session
+        finally:
+            await _reset_rls_context(session)
+
+
 # Convenience alias used by finance and other services for raw asyncpg connections
+@asynccontextmanager
 async def get_database_connection():
     """Get a raw asyncpg connection via the auth module's DatabaseManager.
+
     Usage: async with get_database_connection() as conn: ...
     """
     from shared.auth import db_manager
-    return db_manager.get_connection()
+
+    async with db_manager.get_connection() as conn:
+        yield conn

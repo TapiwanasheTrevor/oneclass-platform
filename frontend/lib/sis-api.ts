@@ -95,6 +95,7 @@ export interface Student {
   user_id?: string
   student_number: string
   zimsec_number?: string
+  profile_photo_url?: string
   
   // Personal Information
   first_name: string
@@ -532,9 +533,9 @@ export const useSISHooks = () => {
       queryKey: ['bulk-import-status', importId],
       queryFn: () => sisApi.getBulkImportStatus(importId),
       enabled: !!importId,
-      refetchInterval: (data) => {
+      refetchInterval: (query) => {
         // Stop polling when import is complete
-        return data?.status === 'processing' ? 2000 : false
+        return query.state.data?.status === 'processing' ? 2000 : false
       },
     })
   }

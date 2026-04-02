@@ -17,7 +17,7 @@ import jwt
 import hashlib
 import hmac
 
-from shared.database import get_db_session
+from shared.database import get_async_db_session
 from shared.exceptions import (
     ValidationError,
     NotFoundError,
@@ -74,7 +74,7 @@ class MobileAuthService:
         self, device_data: DeviceRegistrationCreate, user_id: Optional[str] = None
     ) -> DeviceRegistrationResponse:
         """Register a new device"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             # Check if device already exists
             existing_device = await session.execute(
                 select(DeviceRegistration).where(
@@ -108,7 +108,7 @@ class MobileAuthService:
         self, login_request: MobileLoginRequest
     ) -> MobileLoginResponse:
         """Authenticate user from mobile app"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             # Get school if subdomain provided
             school = None
             if login_request.school_subdomain:
@@ -226,7 +226,7 @@ class MobileAuthService:
         self, request: MobileAuthCodeRequest
     ) -> MobileAuthCodeResponse:
         """Generate authentication code for device linking"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             # Generate unique 6-digit code
             code = self._generate_auth_code()
 
@@ -256,7 +256,7 @@ class MobileAuthService:
         self, request: MobileAuthCodeVerifyRequest
     ) -> MobileAuthCodeVerifyResponse:
         """Verify authentication code and link device to user"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             # Find auth code
             result = await session.execute(
                 select(MobileAuthCode).where(MobileAuthCode.code == request.code)
@@ -291,7 +291,7 @@ class MobileAuthService:
 
     async def refresh_token(self, request: RefreshTokenRequest) -> RefreshTokenResponse:
         """Refresh access token"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             # Find session by refresh token
             result = await session.execute(
                 select(MobileSession)
@@ -350,7 +350,7 @@ class MobileAuthService:
         self, request: BiometricAuthRequest
     ) -> BiometricAuthResponse:
         """Authenticate using biometric data"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             # Get device
             result = await session.execute(
                 select(DeviceRegistration)
@@ -415,7 +415,7 @@ class MobileAuthService:
 
     async def logout_device(self, device_id: str, user_id: str) -> bool:
         """Logout from specific device"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             # Get device
             result = await session.execute(
                 select(DeviceRegistration).where(
@@ -445,7 +445,7 @@ class MobileAuthService:
 
     async def logout_all_devices(self, user_id: str) -> int:
         """Logout from all devices"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             # Deactivate all sessions for this user
             result = await session.execute(
                 update(MobileSession)
@@ -464,7 +464,7 @@ class MobileAuthService:
 
     async def get_user_devices(self, user_id: str) -> List[DeviceRegistrationResponse]:
         """Get all devices for a user"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             result = await session.execute(
                 select(DeviceRegistration)
                 .where(DeviceRegistration.user_id == user_id)
@@ -476,7 +476,7 @@ class MobileAuthService:
 
     async def remove_device(self, device_id: str, user_id: str) -> bool:
         """Remove a device"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             # Get device
             result = await session.execute(
                 select(DeviceRegistration).where(
@@ -511,7 +511,7 @@ class MobileAuthService:
         apns_token: Optional[str] = None,
     ) -> bool:
         """Update push notification token for device"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             result = await session.execute(
                 select(DeviceRegistration).where(
                     DeviceRegistration.device_id == device_id
@@ -538,7 +538,7 @@ class MobileAuthService:
         self, notification: PushNotificationRequest
     ) -> List[PushNotificationResponse]:
         """Send push notification to users"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             notifications = []
 
             for user_id in notification.user_ids:
@@ -586,7 +586,7 @@ class MobileAuthService:
         self, api_key_data: MobileApiKeyCreate
     ) -> MobileApiKeyResponse:
         """Create mobile API key for school"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             # Generate API key and secret
             api_key = self._generate_api_key()
             api_secret = self._generate_api_secret()

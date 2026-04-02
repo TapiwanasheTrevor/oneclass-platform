@@ -3,7 +3,12 @@
 // File: frontend/lib/api.ts
 // =====================================================
 
-import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import axios, {
+  AxiosError,
+  AxiosRequestConfig,
+  AxiosResponse,
+  InternalAxiosRequestConfig,
+} from 'axios';
 import { toast } from 'sonner';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -17,18 +22,53 @@ export const api = axios.create({
   timeout: 30000, // 30 seconds
 });
 
+export type ValidationErrors = Record<string, string | string[]>
+
 // Error response interface from backend
-interface ErrorResponse {
+export interface ErrorResponse {
   success: false;
   error_code: string;
   message: string;
   user_message?: string;
   category: string;
   severity: string;
-  details?: any;
+  details?: unknown;
   correlation_id?: string;
   suggestions?: string[];
   retry_possible?: boolean;
+  errors?: ValidationErrors;
+  validation_errors?: Array<{
+    field?: string;
+    message: string;
+  }>;
+}
+
+export type ApiError = AxiosError<ErrorResponse> & {
+  validationErrors?: ValidationErrors;
+}
+
+function normalizeEndpoint(endpoint: string): string {
+  if (endpoint.startsWith('/api/')) {
+    return endpoint;
+  }
+
+  return `/api/v1${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+}
+
+function extractValidationErrors(errorData?: ErrorResponse): ValidationErrors | undefined {
+  if (errorData?.errors) {
+    return errorData.errors;
+  }
+
+  if (!errorData?.validation_errors?.length) {
+    return undefined;
+  }
+
+  return errorData.validation_errors.reduce<ValidationErrors>((acc, item, index) => {
+    const key = item.field || `error_${index + 1}`;
+    acc[key] = item.message;
+    return acc;
+  }, {});
 }
 
 // --- Clerk token injection ---
@@ -102,10 +142,12 @@ api.interceptors.response.use(
     return response;
   },
   (error: AxiosError<ErrorResponse>) => {
+    const enhancedError = error as ApiError;
+
     // Handle network errors
     if (!error.response) {
       toast.error('Network error. Please check your connection.');
-      return Promise.reject(error);
+      return Promise.reject(enhancedError);
     }
     
     const errorData = error.response.data;
@@ -122,7 +164,7 @@ api.interceptors.response.use(
           window.location.href = '/login';
         }
       }
-      return Promise.reject(error);
+      return Promise.reject(enhancedError);
     }
     
     // Handle authorization errors
@@ -134,7 +176,7 @@ api.interceptors.response.use(
       if (typeof window !== 'undefined' && !window.location.pathname.includes('/unauthorized')) {
         window.location.href = '/unauthorized';
       }
-      return Promise.reject(error);
+      return Promise.reject(enhancedError);
     }
     
     // Handle validation errors (400, 422)
@@ -143,24 +185,25 @@ api.interceptors.response.use(
       toast.error(message);
       
       // Add validation error details to error object for form handling
-      if (errorData?.errors) {
-        error.validationErrors = errorData.errors;
+      const validationErrors = extractValidationErrors(errorData);
+      if (validationErrors) {
+        enhancedError.validationErrors = validationErrors;
       }
-      return Promise.reject(error);
+      return Promise.reject(enhancedError);
     }
     
     // Handle not found errors
     if (status === 404) {
       const message = errorData?.user_message || 'The requested resource was not found';
       toast.error(message);
-      return Promise.reject(error);
+      return Promise.reject(enhancedError);
     }
     
     // Handle conflict errors
     if (status === 409) {
       const message = errorData?.user_message || 'This operation conflicts with existing data';
       toast.error(message);
-      return Promise.reject(error);
+      return Promise.reject(enhancedError);
     }
     
     // Handle rate limiting
@@ -169,7 +212,7 @@ api.interceptors.response.use(
       const retryAfter = error.response.headers['retry-after'];
       const fullMessage = retryAfter ? `${message} (retry in ${retryAfter} seconds)` : message;
       toast.error(fullMessage);
-      return Promise.reject(error);
+      return Promise.reject(enhancedError);
     }
     
     // Handle server errors (5xx)
@@ -187,16 +230,57 @@ api.interceptors.response.use(
         console.error(`Server error - Correlation ID: ${errorData.correlation_id}`);
       }
       
-      return Promise.reject(error);
+      return Promise.reject(enhancedError);
     }
     
     // Handle other errors
     const message = errorData?.user_message || errorData?.message || 'An unexpected error occurred';
     toast.error(message);
     
-    return Promise.reject(error);
+    return Promise.reject(enhancedError);
   }
 );
+
+export class ApiClient {
+  constructor(private readonly client = api) {}
+
+  async get<T>(endpoint: string, config?: AxiosRequestConfig): Promise<T> {
+    const response = await this.client.get<T>(normalizeEndpoint(endpoint), config);
+    return response.data;
+  }
+
+  async post<T, TBody = unknown>(
+    endpoint: string,
+    data?: TBody,
+    config?: AxiosRequestConfig
+  ): Promise<T> {
+    const response = await this.client.post<T>(normalizeEndpoint(endpoint), data, config);
+    return response.data;
+  }
+
+  async put<T, TBody = unknown>(
+    endpoint: string,
+    data?: TBody,
+    config?: AxiosRequestConfig
+  ): Promise<T> {
+    const response = await this.client.put<T>(normalizeEndpoint(endpoint), data, config);
+    return response.data;
+  }
+
+  async patch<T, TBody = unknown>(
+    endpoint: string,
+    data?: TBody,
+    config?: AxiosRequestConfig
+  ): Promise<T> {
+    const response = await this.client.patch<T>(normalizeEndpoint(endpoint), data, config);
+    return response.data;
+  }
+
+  async delete<T = void>(endpoint: string, config?: AxiosRequestConfig): Promise<T> {
+    const response = await this.client.delete<T>(normalizeEndpoint(endpoint), config);
+    return response.data;
+  }
+}
 
 // WebSocket connection for real-time updates
 export class WebSocketManager {
@@ -207,50 +291,7 @@ export class WebSocketManager {
   private subscriptions: Set<string> = new Set();
   
   connect(token: string) {
-    try {
-      // For now, disable WebSocket connections to avoid connection errors
-      // This can be re-enabled once the realtime service is properly configured
-      console.log('WebSocket connection disabled for stability');
-      return;
-
-      const wsUrl = `${API_BASE_URL.replace('http', 'ws')}/api/v1/realtime/ws?token=${token}`;
-      console.log('Attempting WebSocket connection to:', wsUrl);
-
-      this.ws = new WebSocket(wsUrl);
-
-      this.ws.onopen = () => {
-        console.log('WebSocket connected successfully');
-        this.reconnectAttempts = 0;
-
-        // Resubscribe to operations
-        if (this.subscriptions.size > 0) {
-          this.send({
-            type: 'subscribe',
-            operation_ids: Array.from(this.subscriptions)
-          });
-        }
-      };
-    } catch (error) {
-      console.error('Failed to create WebSocket connection:', error);
-    }
-    
-    this.ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        this.handleMessage(data);
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
-      }
-    };
-    
-    this.ws.onclose = () => {
-      console.log('WebSocket disconnected');
-      this.attemptReconnect(token);
-    };
-    
-    this.ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
+    console.log('WebSocket connection disabled for stability', { tokenPresent: !!token });
   }
   
   private attemptReconnect(token: string) {
@@ -266,23 +307,31 @@ export class WebSocketManager {
     }
   }
   
-  private handleMessage(data: any) {
+  private handleMessage(data: Record<string, unknown>) {
     // Emit custom events for different message types
     const event = new CustomEvent('websocket-message', { detail: data });
     window.dispatchEvent(event);
     
     // Handle specific event types
     if (data.event_type === 'progress_update') {
-      const progressEvent = new CustomEvent('progress-update', { detail: data.data });
+      const progressEvent = new CustomEvent('progress-update', {
+        detail: data.data,
+      });
       window.dispatchEvent(progressEvent);
     }
     
     if (data.event_type === 'operation_completed') {
-      toast.success(data.message || 'Operation completed successfully');
+      toast.success(
+        typeof data.message === 'string'
+          ? data.message
+          : 'Operation completed successfully'
+      );
     }
     
     if (data.event_type === 'error_occurred') {
-      toast.error(data.message || 'An error occurred');
+      toast.error(
+        typeof data.message === 'string' ? data.message : 'An error occurred'
+      );
     }
   }
   
@@ -308,7 +357,7 @@ export class WebSocketManager {
     }
   }
   
-  private send(data: any) {
+  private send(data: Record<string, unknown>) {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
     }

@@ -8,12 +8,20 @@ import { BookOpen, Users, TrendingUp, Clock } from 'lucide-react';
 
 const fallback = { my_classes: 0, total_students: 0, avg_performance: 0, todays_periods: 0 };
 
-const cards = [
+interface MetricCardConfig {
+  key: keyof typeof fallback;
+  label: string;
+  icon: typeof BookOpen;
+  color: string;
+  suffix?: string;
+}
+
+const cards: MetricCardConfig[] = [
   { key: 'my_classes', label: 'My Classes', icon: BookOpen, color: 'text-blue-600 bg-blue-100' },
   { key: 'total_students', label: 'Total Students', icon: Users, color: 'text-green-600 bg-green-100' },
   { key: 'avg_performance', label: 'Avg Performance', icon: TrendingUp, color: 'text-amber-600 bg-amber-100', suffix: '%' },
   { key: 'todays_periods', label: "Today's Periods", icon: Clock, color: 'text-purple-600 bg-purple-100' },
-] as const;
+];
 
 export function StaffMetrics() {
   const { user } = useAuth();

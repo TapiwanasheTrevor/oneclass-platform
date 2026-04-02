@@ -12,12 +12,20 @@ const fallbackData = {
   attendance_rate: 0,
 };
 
-const metricCards = [
+interface MetricCardConfig {
+  key: keyof typeof fallbackData;
+  label: string;
+  icon: typeof Users;
+  color: string;
+  suffix?: string;
+}
+
+const metricCards: MetricCardConfig[] = [
   { key: 'total_students', label: 'Total Students', icon: Users, color: 'text-blue-600 bg-blue-100' },
   { key: 'total_staff', label: 'Total Staff', icon: UserCheck, color: 'text-green-600 bg-green-100' },
   { key: 'collection_rate', label: 'Collection Rate', icon: DollarSign, color: 'text-amber-600 bg-amber-100', suffix: '%' },
   { key: 'attendance_rate', label: 'Attendance Rate', icon: CalendarCheck, color: 'text-purple-600 bg-purple-100', suffix: '%' },
-] as const;
+];
 
 export function AdminMetrics() {
   const { data, isLoading } = useQuery({

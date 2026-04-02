@@ -1,15 +1,16 @@
 {
-  "name": "my-v0-project",
+  "name": "oneclass-frontend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
+    "build": "next build --webpack",
     "dev": "next dev",
     "lint": "next lint",
     "start": "next start",
-    "test": "vitest",
-    "test:watch": "vitest --watch",
-    "test:coverage": "vitest --coverage"
+    "type-check": "tsc -p tsconfig.typecheck.json --noEmit",
+    "test": "bash ../scripts/run-frontend-tests.sh",
+    "test:watch": "bash ../scripts/run-frontend-tests.sh --watch",
+    "test:coverage": "bash ../scripts/run-frontend-tests.sh --coverage"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.25.4",

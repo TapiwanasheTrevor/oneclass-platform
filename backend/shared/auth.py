@@ -108,15 +108,47 @@ async def get_database_connection():
 # TOKEN MANAGEMENT
 # =====================================================
 
-def create_access_token(user_id: str, school_id: str) -> str:
-    """Create JWT access token with school context"""
-    payload = {
-        "sub": user_id,
-        "school_id": school_id,
-        "iat": datetime.utcnow(),
-        "exp": datetime.utcnow() + timedelta(hours=24)
-    }
+def create_access_token(
+    user_id: str | None = None,
+    school_id: str | None = None,
+    data: Optional[Dict[str, Any]] = None,
+    expires_delta: Optional[timedelta] = None,
+) -> str:
+    """Create JWT access token.
+
+    Supports both the legacy `(user_id, school_id)` signature and the newer
+    `data={...}` signature used by mobile auth.
+    """
+    payload = data.copy() if data else {}
+    if user_id is not None:
+        payload.setdefault("sub", user_id)
+    if school_id is not None:
+        payload.setdefault("school_id", school_id)
+
+    payload["iat"] = datetime.utcnow()
+    payload["exp"] = datetime.utcnow() + (expires_delta or timedelta(hours=24))
+    payload.setdefault("type", "access")
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def create_refresh_token(
+    data: Dict[str, Any], expires_delta: Optional[timedelta] = None
+) -> str:
+    """Create a refresh token compatible with mobile and auth helpers."""
+    payload = data.copy()
+    payload["iat"] = datetime.utcnow()
+    payload["exp"] = datetime.utcnow() + (
+        expires_delta or timedelta(days=7)
+    )
+    payload["type"] = "refresh"
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def verify_password(password: str, hashed_password: str) -> bool:
+    """Verify a password using the shared auth utility implementation."""
+    from services.auth.utils import verify_password as _verify_password
+
+    return _verify_password(password, hashed_password)
 
 
 async def validate_token(token: str) -> Dict[str, Any]:
@@ -361,6 +393,55 @@ def require_permission(permission: str):
             return await func(*args, **kwargs)
         return wrapper
     return decorator
+
+
+async def require_permissions(current_user, permissions, school_id: Optional[UUID] = None) -> None:
+    """Validate one or more permissions against the current user's effective scope."""
+    requested_permissions = (
+        permissions if isinstance(permissions, list) else [permissions]
+    )
+    user_permissions = getattr(current_user, "permissions", []) or []
+    platform_role = getattr(current_user, "platform_role", None) or getattr(
+        current_user, "global_role", None
+    )
+
+    if platform_role in [
+        GlobalRole.SUPER_ADMIN.value,
+        GlobalRole.PLATFORM_ADMIN.value,
+        "super_admin",
+        "platform_admin",
+    ]:
+        return
+
+    for permission in requested_permissions:
+        if "*" in user_permissions or permission in user_permissions:
+            continue
+
+        module = permission.split(".")[0] if "." in permission else None
+        if module and f"{module}.*" in user_permissions:
+            continue
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Permission required: {permission}",
+        )
+
+
+async def verify_api_key(api_key: str | None) -> bool:
+    """Validate a service API key against configured mobile/integration secrets."""
+    if not api_key:
+        return False
+
+    configured_keys = [
+        os.getenv("MOBILE_API_KEY"),
+        os.getenv("ONECLASS_API_KEY"),
+    ]
+    valid_keys = {key for key in configured_keys if key}
+
+    if not valid_keys:
+        return False
+
+    return api_key in valid_keys
 
 
 # =====================================================

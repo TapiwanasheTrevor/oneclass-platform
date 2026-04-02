@@ -150,7 +150,7 @@ const mockData = {
   ]
 };
 
-const statusColors = {
+const statusColors: Record<string, string> = {
   'pending': 'bg-yellow-100 text-yellow-800',
   'approved': 'bg-blue-100 text-blue-800',
   'in_progress': 'bg-purple-100 text-purple-800',
@@ -164,7 +164,7 @@ const statusColors = {
 };
 
 const getStatusLabel = (status: string) => {
-  const labels = {
+  const labels: Record<string, string> = {
     'pending': 'Pending Assignment',
     'approved': 'Approved',
     'in_progress': 'In Progress',
@@ -186,7 +186,7 @@ function MetricCard({ title, value, icon, trend, color = 'blue' }: {
   trend: string;
   color?: string;
 }) {
-  const colorClasses = {
+  const colorClasses: Record<string, string> = {
     blue: 'bg-blue-500',
     green: 'bg-green-500',
     purple: 'bg-purple-500',

@@ -3,6 +3,7 @@
  * Comprehensive API client for academic management operations
  */
 
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiClient } from './api'
 
 // =====================================================
@@ -65,6 +66,79 @@ export enum EventType {
   MEETING = 'meeting',
   TRAINING = 'training',
   OTHER = 'other'
+}
+
+export interface Question {
+  id?: string
+  question_text: string
+  question_type: 'multiple_choice' | 'short_answer' | 'essay' | 'true_false' | 'numerical'
+  marks: number
+  difficulty_level: 'easy' | 'medium' | 'hard'
+  topic?: string
+  correct_answer?: string
+  answer_options?: string[]
+  explanation?: string
+  time_limit_minutes?: number
+}
+
+export type QuestionCreate = Question
+
+export interface ZimbabweTermOption {
+  value: TermNumber
+  label: string
+  description: string
+}
+
+export interface ZimbabweGradeLevelOption {
+  value: number
+  label: string
+  category: 'Primary' | 'Secondary'
+}
+
+export const zimbabweTerms: ZimbabweTermOption[] = [
+  { value: TermNumber.TERM_1, label: 'Term 1', description: 'January - April' },
+  { value: TermNumber.TERM_2, label: 'Term 2', description: 'May - August' },
+  { value: TermNumber.TERM_3, label: 'Term 3', description: 'September - December' },
+]
+
+export const zimbabweGradeLevels: ZimbabweGradeLevelOption[] = [
+  { value: 1, label: 'Grade 1', category: 'Primary' },
+  { value: 2, label: 'Grade 2', category: 'Primary' },
+  { value: 3, label: 'Grade 3', category: 'Primary' },
+  { value: 4, label: 'Grade 4', category: 'Primary' },
+  { value: 5, label: 'Grade 5', category: 'Primary' },
+  { value: 6, label: 'Grade 6', category: 'Primary' },
+  { value: 7, label: 'Grade 7', category: 'Primary' },
+  { value: 8, label: 'Form 1', category: 'Secondary' },
+  { value: 9, label: 'Form 2', category: 'Secondary' },
+  { value: 10, label: 'Form 3', category: 'Secondary' },
+  { value: 11, label: 'Form 4', category: 'Secondary' },
+  { value: 12, label: 'Lower 6', category: 'Secondary' },
+  { value: 13, label: 'Upper 6', category: 'Secondary' },
+]
+
+export const zimbabweGradeScale = [
+  { minimum: 80, grade: GradingScale.A },
+  { minimum: 70, grade: GradingScale.B },
+  { minimum: 60, grade: GradingScale.C },
+  { minimum: 50, grade: GradingScale.D },
+  { minimum: 40, grade: GradingScale.E },
+  { minimum: 0, grade: GradingScale.U },
+]
+
+export function formatTerm(term: number): string {
+  return zimbabweTerms.find((item) => item.value === term)?.label ?? `Term ${term}`
+}
+
+export function formatGradeLevel(level: number): string {
+  return zimbabweGradeLevels.find((item) => item.value === level)?.label ?? `Grade ${level}`
+}
+
+export function getZimbabweGrade(percentage: number): GradingScale {
+  return (
+    zimbabweGradeScale.find((item) => percentage >= item.minimum)?.grade ??
+    GradingScale.U
+  )
 }
 
 // Subject interfaces
@@ -470,6 +544,9 @@ export interface BulkOperationResponse {
   failed: number
   errors: any[]
   created_ids: string[]
+  records_processed?: number
+  grades_submitted?: number
+  grades_updated?: number
 }
 
 // Filter interfaces
@@ -573,6 +650,10 @@ class AcademicApi {
     return this.api.post('/academic/periods', data)
   }
 
+  async getPeriods(): Promise<PaginatedResponse<Period>> {
+    return this.api.get('/academic/periods')
+  }
+
   async createTimetableEntry(data: TimetableCreate): Promise<Timetable> {
     return this.api.post('/academic/timetables', data)
   }
@@ -649,4 +730,113 @@ class AcademicApi {
 }
 
 export const academicApi = new AcademicApi()
+
+export function useAcademicHooks() {
+  const queryClient = useQueryClient()
+
+  return {
+    useSubjects: (filters: SubjectFilters = {}) =>
+      useQuery({
+        queryKey: ['academic', 'subjects', filters],
+        queryFn: () => academicApi.getSubjects(filters),
+      }),
+
+    useCreateSubject: () =>
+      useMutation({
+        mutationFn: (data: SubjectCreate) => academicApi.createSubject(data),
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({ queryKey: ['academic', 'subjects'] })
+        },
+      }),
+
+    useUpdateSubject: () =>
+      useMutation({
+        mutationFn: ({ id, data }: { id: string; data: SubjectUpdate }) =>
+          academicApi.updateSubject(id, data),
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({ queryKey: ['academic', 'subjects'] })
+        },
+      }),
+
+    useDeleteSubject: () =>
+      useMutation({
+        mutationFn: (id: string) => academicApi.deleteSubject(id),
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({ queryKey: ['academic', 'subjects'] })
+        },
+      }),
+
+    useCreateAssessment: () =>
+      useMutation({
+        mutationFn: (data: AssessmentCreate) => academicApi.createAssessment(data),
+        onSuccess: async () => {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['academic', 'assessments'] }),
+            queryClient.invalidateQueries({ queryKey: ['academic', 'teacher-dashboard'] }),
+            queryClient.invalidateQueries({ queryKey: ['academic', 'dashboard'] }),
+          ])
+        },
+      }),
+
+    useCreateAttendanceSession: () =>
+      useMutation({
+        mutationFn: (data: {
+          timetable_id: string
+          session_date: string
+          session_type?: SessionType
+          notes?: string
+        }) => academicApi.createAttendanceSession(data),
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({ queryKey: ['academic', 'attendance'] })
+        },
+      }),
+
+    useMarkBulkAttendance: () =>
+      useMutation({
+        mutationFn: (data: BulkAttendanceCreate) => academicApi.markBulkAttendance(data),
+        onSuccess: async () => {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['academic', 'attendance'] }),
+            queryClient.invalidateQueries({ queryKey: ['academic', 'attendance-stats'] }),
+          ])
+        },
+      }),
+
+    useAttendanceStats: (filters: AttendanceStatsFilters = {}) =>
+      useQuery({
+        queryKey: ['academic', 'attendance-stats', filters],
+        queryFn: () => academicApi.getAttendanceStats(filters),
+      }),
+
+    usePeriods: () =>
+      useQuery({
+        queryKey: ['academic', 'periods'],
+        queryFn: () => academicApi.getPeriods(),
+      }),
+
+    useCreatePeriod: () =>
+      useMutation({
+        mutationFn: (data: PeriodCreate) => academicApi.createPeriod(data),
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({ queryKey: ['academic', 'periods'] })
+        },
+      }),
+
+    useCreateTimetable: () =>
+      useMutation({
+        mutationFn: (data: TimetableCreate) => academicApi.createTimetableEntry(data),
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({ queryKey: ['academic', 'timetables'] })
+        },
+      }),
+
+    useTeacherDashboard: (academicYearId: string, teacherId?: string) =>
+      useQuery({
+        queryKey: ['academic', 'teacher-dashboard', academicYearId, teacherId],
+        queryFn: () => academicApi.getTeacherDashboard(academicYearId, teacherId),
+        enabled: Boolean(academicYearId),
+      }),
+  }
+}
+
 export default academicApi

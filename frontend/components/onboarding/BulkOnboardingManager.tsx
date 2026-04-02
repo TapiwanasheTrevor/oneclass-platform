@@ -209,7 +209,7 @@ export const BulkOnboardingManager: React.FC = () => {
   };
 
   React.useEffect(() => {
-    if (canManageUsers) {
+    if (canManageUsers()) {
       fetchImportHistory();
     }
   }, [canManageUsers]);

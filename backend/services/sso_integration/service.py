@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 import logging
 
-from shared.database import get_db_session
+from shared.database import get_async_db_session
 from shared.exceptions import (
     ValidationError,
     NotFoundError,
@@ -21,7 +21,6 @@ from shared.exceptions import (
     AuthenticationError,
     ExternalServiceError
 )
-from shared.models.platform import 
 from shared.models.platform_user import PlatformUser as User
 from shared.models.platform import School
 from .models import (
@@ -56,10 +55,30 @@ from .schemas import (
     SSOEventType,
     SSOEventStatus
 )
-from .saml_handler import SAMLHandler
-from .ldap_handler import LDAPHandler
 
 logger = logging.getLogger(__name__)
+
+
+def _get_saml_handler():
+    try:
+        from .saml_handler import SAMLHandler
+
+        return SAMLHandler
+    except ImportError as exc:
+        raise ExternalServiceError(
+            "SAML support is unavailable because optional OneLogin dependencies are not installed"
+        ) from exc
+
+
+def _get_ldap_handler():
+    try:
+        from .ldap_handler import LDAPHandler
+
+        return LDAPHandler
+    except ImportError as exc:
+        raise ExternalServiceError(
+            "LDAP support is unavailable because ldap dependencies are not installed"
+        ) from exc
 
 
 class SSOIntegrationService:
@@ -72,7 +91,7 @@ class SSOIntegrationService:
     
     async def create_sso_provider(self, provider_data: SSOProviderCreate, created_by: str) -> SSOProviderResponse:
         """Create a new SSO provider"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             # Check if school already has a default provider of this type
             if provider_data.is_default:
                 existing_default = await session.execute(
@@ -114,7 +133,7 @@ class SSOIntegrationService:
     
     async def get_sso_provider(self, provider_id: str) -> SSOProviderResponse:
         """Get SSO provider by ID"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             provider = await session.get(SSOProvider, provider_id)
             if not provider:
                 raise NotFoundError(f"SSO provider not found: {provider_id}")
@@ -123,7 +142,7 @@ class SSOIntegrationService:
     
     async def get_school_sso_providers(self, school_id: str) -> List[SSOProviderResponse]:
         """Get all SSO providers for a school"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             result = await session.execute(
                 select(SSOProvider)
                 .where(SSOProvider.school_id == school_id)
@@ -135,7 +154,7 @@ class SSOIntegrationService:
     
     async def update_sso_provider(self, provider_id: str, provider_data: SSOProviderUpdate) -> SSOProviderResponse:
         """Update SSO provider"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             provider = await session.get(SSOProvider, provider_id)
             if not provider:
                 raise NotFoundError(f"SSO provider not found: {provider_id}")
@@ -170,7 +189,7 @@ class SSOIntegrationService:
     
     async def delete_sso_provider(self, provider_id: str) -> bool:
         """Delete SSO provider"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             provider = await session.get(SSOProvider, provider_id)
             if not provider:
                 raise NotFoundError(f"SSO provider not found: {provider_id}")
@@ -203,7 +222,7 @@ class SSOIntegrationService:
     
     async def create_saml_provider(self, saml_data: SAMLProviderCreate) -> SAMLProviderResponse:
         """Create SAML provider configuration"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             # Check if SSO provider exists
             sso_provider = await session.get(SSOProvider, saml_data.sso_provider_id)
             if not sso_provider:
@@ -242,7 +261,7 @@ class SSOIntegrationService:
     
     async def create_ldap_provider(self, ldap_data: LDAPProviderCreate) -> LDAPProviderResponse:
         """Create LDAP provider configuration"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             # Check if SSO provider exists
             sso_provider = await session.get(SSOProvider, ldap_data.sso_provider_id)
             if not sso_provider:
@@ -283,7 +302,7 @@ class SSOIntegrationService:
     
     async def authenticate_user(self, login_request: SSOLoginRequest) -> SSOLoginResponse:
         """Authenticate user via SSO"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             # Get SSO provider
             provider = await session.get(SSOProvider, login_request.provider_id)
             if not provider:
@@ -337,7 +356,7 @@ class SSOIntegrationService:
             raise ValidationError("SAML provider configuration not found")
         
         # Initialize SAML handler
-        saml_handler = SAMLHandler(saml_provider)
+        saml_handler = _get_saml_handler()(saml_provider)
         
         # Process SAML response
         if login_request.saml_response:
@@ -415,7 +434,7 @@ class SSOIntegrationService:
             raise ValidationError("LDAP provider configuration not found")
         
         # Initialize LDAP handler
-        ldap_handler = LDAPHandler(ldap_provider)
+        ldap_handler = _get_ldap_handler()(ldap_provider)
         
         # Authenticate user
         if not login_request.password:
@@ -549,7 +568,7 @@ class SSOIntegrationService:
             email=email,
             ip_address=ip_address,
             user_agent=user_agent,
-            metadata=metadata or {}
+            metadata_json=metadata or {}
         )
         
         session.add(audit_log)
@@ -592,7 +611,7 @@ class SSOIntegrationService:
         saml_provider.sso_provider = sso_provider
         
         # Test connection
-        saml_handler = SAMLHandler(saml_provider)
+        saml_handler = _get_saml_handler()(saml_provider)
         result = saml_handler.test_connection()
         
         return SSOTestConnectionResponse(
@@ -624,7 +643,7 @@ class SSOIntegrationService:
         ldap_provider.sso_provider = sso_provider
         
         # Test connection
-        ldap_handler = LDAPHandler(ldap_provider)
+        ldap_handler = _get_ldap_handler()(ldap_provider)
         result = await ldap_handler.test_connection()
         
         return SSOTestConnectionResponse(
@@ -635,7 +654,7 @@ class SSOIntegrationService:
     
     async def get_sso_stats(self, school_id: str) -> SSOStatsResponse:
         """Get SSO statistics for a school"""
-        async with get_db_session() as session:
+        async with get_async_db_session() as session:
             # Get provider counts
             provider_counts = await session.execute(
                 select(

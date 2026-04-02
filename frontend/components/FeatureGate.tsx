@@ -13,7 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { Lock, Crown, Zap } from 'lucide-react';
 
 interface FeatureGateProps {
-  feature: string;
+  feature?: string;
+  requiredModule?: string;
   children: React.ReactNode;
   fallback?: React.ReactNode;
   showUpgradePrompt?: boolean;
@@ -21,11 +22,18 @@ interface FeatureGateProps {
 
 export function FeatureGate({ 
   feature, 
+  requiredModule,
   children, 
   fallback, 
   showUpgradePrompt = true 
 }: FeatureGateProps) {
-  const { hasAccess, tier, upgradeRequired } = useFeatureAccess(feature);
+  const featureKey = feature ?? requiredModule;
+
+  if (!featureKey) {
+    return <>{children}</>;
+  }
+
+  const { hasAccess, tier } = useFeatureAccess(featureKey);
 
   if (hasAccess) {
     return <>{children}</>;
@@ -36,7 +44,7 @@ export function FeatureGate({
   }
 
   if (showUpgradePrompt) {
-    return <UpgradePrompt feature={feature} currentTier={tier} />;
+    return <UpgradePrompt feature={featureKey} currentTier={tier} />;
   }
 
   return null;

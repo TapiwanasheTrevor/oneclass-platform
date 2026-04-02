@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from 'react';
-import { useAuth, useSchoolContext, SchoolRole } from '@/hooks/useAuth';
+import { useAuth, SchoolRole } from '@/hooks/useAuth';
+import { useSchoolContext } from '@/hooks/useSchoolContext';
 import { api } from '@/lib/api';
 import RoleBasedDashboard from '@/components/dashboard/RoleBasedDashboard';
 import SuperAdminDashboard from '@/components/admin/SuperAdminDashboard';
@@ -48,13 +49,13 @@ export default function DashboardContent() {
     // Map based on school role if available
     if (currentSchool?.role) {
       switch (currentSchool.role) {
-        case 'admin':
-        case 'principal':
-        case 'registrar':
+        case SchoolRole.SCHOOL_ADMIN:
+        case SchoolRole.PRINCIPAL:
+        case SchoolRole.REGISTRAR:
           return 'admin';
-        case 'teacher':
+        case SchoolRole.TEACHER:
           return 'teacher';
-        case 'parent':
+        case SchoolRole.PARENT:
           return 'parent';
         default:
           return 'student';

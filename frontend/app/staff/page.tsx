@@ -27,6 +27,9 @@ import { useSchoolContext } from '@/hooks/useSchoolContext';
 const StaffDashboard = () => {
   const { user } = useAuth();
   const { school, hasFeature, canAccess } = useSchoolContext();
+  const roleLabel = user?.role
+    ? `${user.role.charAt(0).toUpperCase()}${user.role.slice(1)}`
+    : 'Staff';
 
   const isTeacher = user?.role === 'teacher';
   const isRegistrar = user?.role === 'registrar';
@@ -46,7 +49,7 @@ const StaffDashboard = () => {
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-sm">
-            {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}
+            {roleLabel}
           </Badge>
         </div>
       </div>

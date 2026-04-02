@@ -8,27 +8,27 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_
-from datetime import datetime, timedelta
+from sqlalchemy import select, and_
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
-import bcrypt
 import jwt
 import logging
-from uuid import uuid4, UUID
+from uuid import uuid4
 
 from shared.database import get_async_session
 from shared.models.platform_user import (
     PlatformUser,
     UserSession,
     SchoolMembership,
+    MembershipStatus,
+    UserStatus,
 )
-from shared.models.platform import School
-from shared.middleware.tenant_middleware import get_tenant_context, TenantContext
-from shared.auth import db_manager, validate_token, create_access_token as create_context_token
+from shared.auth import db_manager
 from .schemas import (
     LoginRequest,
     LoginResponse,
     RefreshTokenRequest,
+    SwitchSchoolRequest,
     UserRegistrationRequest,
     PasswordResetRequest,
     OnboardingCompleteRequest,
@@ -49,6 +49,10 @@ logger = logging.getLogger(__name__)
 
 # Initialize auth service
 auth_service = AuthService()
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 async def get_current_tenant_info(request: Request) -> Optional[Dict[str, Any]]:
@@ -141,7 +145,7 @@ async def login(
         query = select(PlatformUser).where(
             and_(
                 PlatformUser.email == login_data.email.lower(),
-                PlatformUser.is_active.is_(True),
+                PlatformUser.status == UserStatus.ACTIVE.value,
             )
         )
         result = await db.execute(query)
@@ -176,7 +180,7 @@ async def login(
         memberships_query = select(SchoolMembership).where(
             and_(
                 SchoolMembership.user_id == user.id,
-                SchoolMembership.status == "active",
+                SchoolMembership.status == MembershipStatus.ACTIVE.value,
             )
         )
         memberships_result = await db.execute(memberships_query)
@@ -189,17 +193,21 @@ async def login(
         if tenant_info and tenant_info.get("school_id"):
             # Check if user has access to this school
             school_membership = next(
-                (m for m in memberships if m.school_id == tenant_info["school_id"]),
+                (
+                    m
+                    for m in memberships
+                    if str(m.school_id) == str(tenant_info["school_id"])
+                ),
                 None,
             )
             if school_membership:
                 current_school_membership = school_membership
-                primary_school_id = tenant_info["school_id"]
+                primary_school_id = school_membership.school_id
 
         if not current_school_membership and memberships:
             # Use primary school or first available
             primary_membership = next(
-                (m for m in memberships if m.school_id == user.primary_school_id),
+                (m for m in memberships if m.school_id == primary_school_id),
                 memberships[0],
             )
             current_school_membership = primary_membership
@@ -207,30 +215,40 @@ async def login(
 
         # Create session
         session_id = str(uuid4())
-        refresh_token = str(uuid4())  # Generate refresh token
         session = UserSession(
             user_id=user.id,
             session_id=session_id,
-            refresh_token=refresh_token,
             ip_address=request.client.host,
             user_agent=request.headers.get("user-agent", ""),
-            expires_at=datetime.utcnow() + timedelta(days=30),  # 30 day expiry
+            current_school_id=(
+                auth_service._coerce_uuid(primary_school_id)
+                if primary_school_id
+                else None
+            ),
+            available_school_ids=[str(m.school_id) for m in memberships],
+            last_activity_at=_utcnow(),
+            expires_at=_utcnow() + timedelta(days=30),  # 30 day expiry
             is_active=True,
         )
 
         db.add(session)
 
         # Update user last login
-        user.last_login = datetime.utcnow()
+        user.last_login_at = _utcnow()
+        user.last_activity_at = _utcnow()
+        user.login_count = (user.login_count or 0) + 1
+        user.failed_login_attempts = 0
 
         # Generate tokens
         access_token = create_access_token(
             data={
                 "sub": str(user.id),
                 "email": user.email,
-                "session_id": str(session_id),
-                "school_id": str(primary_school_id) if primary_school_id else None,
-                "platform_role": user.platform_role,
+                "session_id": session_id,
+                "school_id": (
+                    str(session.current_school_id) if session.current_school_id else None
+                ),
+                "platform_role": user.global_role,
                 "school_role": (
                     current_school_membership.school_role
                     if current_school_membership
@@ -247,6 +265,11 @@ async def login(
         session.refresh_token = refresh_token
 
         await db.commit()
+        user_data = await auth_service.get_user_with_context(
+            db,
+            str(user.id),
+            str(session.current_school_id) if session.current_school_id else None,
+        )
 
         # Set secure HTTP-only cookie for refresh token
         response.set_cookie(
@@ -258,70 +281,6 @@ async def login(
             samesite="strict",
         )
 
-        # Prepare user data with school memberships
-        user_data = {
-            "id": str(user.id),
-            "email": user.email,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "full_name": user.full_name,
-            "platform_role": user.platform_role,
-            "status": user.status,
-            "primary_school_id": (
-                str(user.primary_school_id) if user.primary_school_id else None
-            ),
-            "profile": user.user_metadata or {},
-            "feature_flags": {},
-            "user_preferences": user.preferences or {},
-            "created_at": user.created_at.isoformat(),
-            "last_login": user.last_login.isoformat() if user.last_login else None,
-            "school_memberships": [],
-        }
-
-        # Add school membership details
-        for membership in memberships:
-            # Get school details
-            school_query = select(School).where(School.id == membership.school_id)
-            school_result = await db.execute(school_query)
-            school = school_result.scalar_one_or_none()
-
-            if school:
-                user_data["school_memberships"].append(
-                    {
-                        "school_id": str(membership.school_id),
-                        "school_name": school.name,
-                        "school_subdomain": school.subdomain,
-                        "role": membership.school_role,
-                        "permissions": membership.permissions,
-                        "joined_date": membership.joined_date.isoformat(),
-                        "status": membership.status,
-                        "student_id": membership.student_id,
-                        "current_grade": membership.current_grade,
-                        "admission_date": (
-                            membership.admission_date.isoformat()
-                            if membership.admission_date
-                            else None
-                        ),
-                        "graduation_date": (
-                            membership.graduation_date.isoformat()
-                            if membership.graduation_date
-                            else None
-                        ),
-                        "employee_id": membership.employee_id,
-                        "department": membership.department,
-                        "hire_date": (
-                            membership.hire_date.isoformat()
-                            if membership.hire_date
-                            else None
-                        ),
-                        "contract_type": membership.contract_type,
-                        "children_ids": [
-                            str(child_id)
-                            for child_id in (membership.children_ids or [])
-                        ],
-                    }
-                )
-
         logger.info(f"Successful login for {user.email} from {request.client.host}")
 
         return LoginResponse(
@@ -329,7 +288,7 @@ async def login(
             token_type="bearer",
             expires_in=3600,  # 1 hour
             refresh_token=refresh_token,
-            user=user_data,
+            user=user_data or {},
         )
 
     except HTTPException:
@@ -369,8 +328,8 @@ async def get_current_user(
         session_query = select(UserSession).where(
             and_(
                 UserSession.session_id == session_id,
-                UserSession.user_id == user_id,
-                UserSession.is_active == True,
+                UserSession.user_id == auth_service._coerce_uuid(user_id),
+                UserSession.is_active.is_(True),
             )
         )
         session_result = await db.execute(session_query)
@@ -382,10 +341,18 @@ async def get_current_user(
             )
 
         # Update session activity
-        session.last_activity = datetime.utcnow()
+        session.last_activity_at = _utcnow()
 
         # Get user with memberships
-        user = await auth_service.get_user_with_context(db, user_id)
+        user = await auth_service.get_user_with_context(
+            db,
+            user_id,
+            (
+                str(session.current_school_id)
+                if session.current_school_id
+                else payload.get("school_id")
+            ),
+        )
 
         if not user:
             raise HTTPException(
@@ -396,6 +363,8 @@ async def get_current_user(
 
         return UserContextResponse(**user)
 
+    except HTTPException:
+        raise
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired"
@@ -441,22 +410,27 @@ async def refresh_token(
         # Verify session exists and refresh token matches
         session_query = select(UserSession).where(
             and_(
-                UserSession.id == session_id,
-                UserSession.user_id == user_id,
+                UserSession.session_id == session_id,
+                UserSession.user_id == auth_service._coerce_uuid(user_id),
                 UserSession.refresh_token == refresh_token,
-                UserSession.is_active == True,
+                UserSession.is_active.is_(True),
             )
         )
         session_result = await db.execute(session_query)
         session = session_result.scalar_one_or_none()
 
-        if not session:
+        if not session or session.is_expired:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
             )
 
         # Get user for token data
-        user_query = select(PlatformUser).where(PlatformUser.id == user_id)
+        user_query = select(PlatformUser).where(
+            and_(
+                PlatformUser.id == auth_service._coerce_uuid(user_id),
+                PlatformUser.status == UserStatus.ACTIVE.value,
+            )
+        )
         user_result = await db.execute(user_query)
         user = user_result.scalar_one_or_none()
 
@@ -465,19 +439,32 @@ async def refresh_token(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
             )
 
+        current_membership = None
+        if session.current_school_id:
+            current_membership = await auth_service.verify_user_school_access(
+                db,
+                user_id,
+                str(session.current_school_id),
+            )
+
         # Create new access token
         access_token = create_access_token(
             data={
                 "sub": str(user.id),
                 "email": user.email,
                 "session_id": session_id,
-                "school_id": session.school_id,
-                "platform_role": user.platform_role,
+                "school_id": (
+                    str(session.current_school_id) if session.current_school_id else None
+                ),
+                "platform_role": user.global_role,
+                "school_role": (
+                    current_membership.school_role if current_membership else None
+                ),
             }
         )
 
         # Update session activity
-        session.last_activity = datetime.utcnow()
+        session.last_activity_at = _utcnow()
         await db.commit()
 
         return {
@@ -486,6 +473,8 @@ async def refresh_token(
             "expires_in": 3600,
         }
 
+    except HTTPException:
+        raise
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token expired"
@@ -515,16 +504,22 @@ async def logout(
         # Verify token to get session info
         payload = verify_token(credentials.credentials)
         session_id = payload.get("session_id")
+        user_id = payload.get("sub")
 
-        if session_id:
+        if session_id and user_id:
             # Deactivate session
-            session_query = select(UserSession).where(UserSession.id == session_id)
+            session_query = select(UserSession).where(
+                and_(
+                    UserSession.session_id == session_id,
+                    UserSession.user_id == auth_service._coerce_uuid(user_id),
+                )
+            )
             session_result = await db.execute(session_query)
             session = session_result.scalar_one_or_none()
 
             if session:
                 session.is_active = False
-                session.ended_at = datetime.utcnow()
+                session.last_activity_at = _utcnow()
 
         # Clear refresh token cookie
         response.delete_cookie(
@@ -652,58 +647,106 @@ async def complete_onboarding(
 
 @router.post("/switch-school")
 async def switch_school(
-    school_id: str,
+    switch_data: SwitchSchoolRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_async_session),
 ):
     """
     Switch user's current school context and return a fresh access token with updated context.
     """
     try:
-        # Validate token and get user id
-        token_data = await validate_token(credentials.credentials)
+        token_data = verify_token(credentials.credentials)
         user_id = token_data.get("sub")
+        session_id = token_data.get("session_id")
+        school_id = switch_data.school_id
         if not user_id:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+            )
 
-        # Verify user has access to the school (using consolidated schema)
-        async with db_manager.get_connection() as conn:
-            membership_query = """
-                SELECT 1
-                FROM platform.school_memberships
-                WHERE user_id = $1 AND school_id = $2 AND status = 'active'
-            """
-            has_access = await conn.fetchval(membership_query, UUID(user_id), UUID(school_id))
-            if not has_access:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this school")
+        if not session_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session context missing from token",
+            )
+
+        session_query = select(UserSession).where(
+            and_(
+                UserSession.session_id == session_id,
+                UserSession.user_id == auth_service._coerce_uuid(user_id),
+                UserSession.is_active.is_(True),
+            )
+        )
+        session_result = await db.execute(session_query)
+        session = session_result.scalar_one_or_none()
+
+        if not session or session.is_expired:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session expired",
+            )
+
+        membership = await auth_service.verify_user_school_access(db, user_id, school_id)
+        if not membership:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied to this school",
+            )
+
+        user_query = select(PlatformUser).where(
+            and_(
+                PlatformUser.id == auth_service._coerce_uuid(user_id),
+                PlatformUser.status == UserStatus.ACTIVE.value,
+            )
+        )
+        user_result = await db.execute(user_query)
+        user = user_result.scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found",
+            )
+
+        available_school_ids = [str(sid) for sid in (session.available_school_ids or [])]
+        if school_id not in available_school_ids:
+            available_school_ids.append(school_id)
+
+        session.current_school_id = auth_service._coerce_uuid(school_id)
+        session.available_school_ids = available_school_ids
+        session.school_switch_count = (session.school_switch_count or 0) + 1
+        session.last_school_switch_at = _utcnow()
+        session.last_activity_at = _utcnow()
 
         # Issue new access token scoped to selected school
-        new_access_token = create_access_token(user_id, school_id)
-
-        # Optionally: fetch minimal current school context to return
-        async with db_manager.get_connection() as conn:
-            school_query = """
-                SELECT name, subdomain, subscription_tier
-                FROM platform.schools
-                WHERE id = $1
-            """
-            school_row = await conn.fetchrow(school_query, UUID(school_id))
-            current_school = {
+        new_access_token = create_access_token(
+            data={
+                "sub": str(user.id),
+                "email": user.email,
+                "session_id": session.session_id,
                 "school_id": school_id,
-                "school_name": school_row["name"] if school_row else None,
-                "subdomain": school_row["subdomain"] if school_row else None,
-                "subscription_tier": school_row["subscription_tier"] if school_row else None,
+                "platform_role": user.global_role,
+                "school_role": membership.school_role,
             }
+        )
+
+        await db.commit()
+
+        user_context = await auth_service.get_user_with_context(db, user_id, school_id)
+        current_school = user_context.get("current_school") if user_context else None
 
         return {
             "message": "School context switched successfully",
             "access_token": new_access_token,
             "current_school": current_school,
+            "user": user_context,
         }
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"School switch error: {str(e)}")
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to switch school context",
@@ -727,8 +770,8 @@ async def get_my_schools(
 
         memberships_query = select(SchoolMembership).where(
             and_(
-                SchoolMembership.user_id == user_id,
-                SchoolMembership.status == "active",
+                SchoolMembership.user_id == auth_service._coerce_uuid(user_id),
+                SchoolMembership.status == MembershipStatus.ACTIVE.value,
             )
         )
         result = await db.execute(memberships_query)

@@ -25,6 +25,10 @@ class LoginResponse(BaseModel):
 class RefreshTokenRequest(BaseModel):
     refresh_token: Optional[str] = None
 
+
+class SwitchSchoolRequest(BaseModel):
+    school_id: str
+
 class UserRegistrationRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=128)
@@ -143,14 +147,24 @@ class UserContextResponse(BaseModel):
     last_name: str
     full_name: str
     platform_role: str
+    global_role: Optional[str] = None
+    role: Optional[str] = None
     status: str
     primary_school_id: Optional[str] = None
+    current_school_id: Optional[str] = None
     school_memberships: List[SchoolMembershipResponse]
-    profile: Optional[UserProfileData] = None
+    profile: Optional[Dict[str, Any]] = None
+    current_school: Optional[Dict[str, Any]] = None
     created_at: str
     last_login: Optional[str] = None
-    feature_flags: Dict[str, bool]
-    user_preferences: Dict[str, Any]
+    last_login_at: Optional[str] = None
+    feature_flags: Dict[str, bool] = Field(default_factory=dict)
+    user_preferences: Dict[str, Any] = Field(default_factory=dict)
+    contact_information: Dict[str, Any] = Field(default_factory=dict)
+    personal_profile: Dict[str, Any] = Field(default_factory=dict)
+    clerk_user_id: Optional[str] = None
+    is_email_verified: bool = False
+    login_count: int = 0
 
 class TokenData(BaseModel):
     user_id: str

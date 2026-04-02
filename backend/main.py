@@ -20,6 +20,21 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+ENABLE_EXPERIMENTAL_USER_MANAGEMENT = _env_flag(
+    "ONECLASS_ENABLE_EXPERIMENTAL_USER_MANAGEMENT", default=False
+)
+ENABLE_EXPERIMENTAL_MIGRATION_SERVICES = _env_flag(
+    "ONECLASS_ENABLE_EXPERIMENTAL_MIGRATION_SERVICES", default=False
+)
+
 # Create FastAPI app
 app = FastAPI(
     title="OneClass Platform API",
@@ -109,40 +124,14 @@ async def api_health():
 # Include API Gateway routes
 try:
     from api.router import api_router
-    from api.subdomain import subdomain_router
 
     # Include main API routes
     app.include_router(api_router)
-    app.include_router(subdomain_router)
 
     logger.info("API Gateway routes loaded successfully")
 
 except ImportError as e:
     logger.error(f"Failed to load API Gateway routes: {e}")
-
-# Include Platform Public routes (for tenant discovery)
-try:
-    from services.platform.routes.schools_public import router as schools_public_router
-
-    # Include public schools routes
-    app.include_router(schools_public_router, prefix="/api/v1/platform")
-
-    logger.info("Platform public routes loaded successfully")
-
-except ImportError as e:
-    logger.warning(f"Platform public routes not available: {e}")
-
-# Include Simple Platform routes (bypass tenant middleware)
-try:
-    from services.platform.routes.schools_simple import router as schools_simple_router
-
-    # Include simple schools routes
-    app.include_router(schools_simple_router, prefix="/api/v1/platform")
-
-    logger.info("Platform simple routes loaded successfully")
-
-except ImportError as e:
-    logger.warning(f"Platform simple routes not available: {e}")
 
 # Include Authentication module
 try:
@@ -190,41 +179,8 @@ try:
     add_academic_error_middleware(app)
     setup_academic_exception_handlers(app)
     
-    # Include academic routes
+    # Include academic routes (router already exposes /health)
     app.include_router(academic_router)
-
-    @app.get("/api/v1/academic/health")
-    async def academic_health():
-        """Academic module health check"""
-        return {
-            "status": "healthy",
-            "service": "academic",
-            "version": "1.0.0",
-            "timestamp": datetime.utcnow().isoformat(),
-            "module": "academic_management",
-            "features": [
-                "subject_management",
-                "curriculum_planning",
-                "timetable_scheduling",
-                "attendance_tracking",
-                "assessment_management",
-                "grade_calculation",
-                "lesson_planning",
-                "academic_calendar",
-                "performance_analytics",
-                "zimbabwe_compliance",
-                "comprehensive_error_handling",
-                "audit_logging",
-                "role_based_permissions"
-            ],
-            "zimbabwe_features": [
-                "three_term_system",
-                "a_to_u_grading_scale",
-                "primary_secondary_structure",
-                "cambridge_curriculum_support",
-                "zimsec_integration_ready"
-            ],
-        }
 
     logger.info("Academic Management module with error handling loaded successfully")
 
@@ -281,69 +237,64 @@ except ImportError as e:
 
 
 # Include User Management module
-try:
-    from services.user_management.routes import router as user_management_router
+if ENABLE_EXPERIMENTAL_USER_MANAGEMENT:
+    try:
+        from services.user_management.routes import router as user_management_router
 
-    # Include user management routes
-    app.include_router(user_management_router, prefix="/api/v1")
+        app.include_router(user_management_router, prefix="/api/v1")
 
+        @app.get("/api/v1/users/health")
+        async def user_management_health():
+            """User Management module health check"""
+            return {
+                "status": "experimental",
+                "service": "user_management",
+                "version": "1.0.0",
+                "timestamp": datetime.utcnow().isoformat(),
+                "module": "User Management System",
+                "features": [
+                    "role_based_user_creation",
+                    "user_invitations",
+                    "bulk_user_import",
+                    "user_profile_management",
+                    "custom_roles",
+                ],
+            }
+
+        logger.warning("Experimental user management module loaded")
+
+    except ImportError as e:
+        logger.warning(f"User Management module not available: {e}")
+
+        @app.get("/api/v1/users/health")
+        async def user_management_health_fallback():
+            """User Management module health check fallback"""
+            return {
+                "status": "unavailable",
+                "service": "user_management",
+                "error": "Module not loaded",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+else:
     @app.get("/api/v1/users/health")
-    async def user_management_health():
-        """User Management module health check"""
+    async def user_management_health_disabled():
+        """User Management module health check when disabled by default."""
         return {
-            "status": "healthy",
+            "status": "disabled",
             "service": "user_management",
-            "version": "1.0.0",
+            "error": "Experimental module disabled for expansion readiness",
             "timestamp": datetime.utcnow().isoformat(),
-            "module": "User Management System",
-            "features": [
-                "role_based_user_creation",
-                "user_invitations",
-                "bulk_user_import",
-                "user_profile_management",
-                "custom_roles",
-            ],
         }
 
-    logger.info("User Management module loaded successfully")
-
-except ImportError as e:
-    logger.warning(f"User Management module not available: {e}")
-
-    @app.get("/api/v1/users/health")
-    async def user_management_health_fallback():
-        """User Management module health check fallback"""
-        return {
-            "status": "unavailable",
-            "service": "user_management",
-            "error": "Module not loaded",
-            "timestamp": datetime.utcnow().isoformat(),
-        }
+    logger.info("Experimental user management module disabled")
 
 
 # Include Realtime module
 try:
     from services.realtime.routes import router as realtime_router
 
-    # Include realtime routes
+    # Include realtime routes (router already exposes /health)
     app.include_router(realtime_router)
-
-    @app.get("/api/v1/realtime/health")
-    async def realtime_health():
-        """Realtime module health check"""
-        return {
-            "status": "healthy",
-            "service": "realtime",
-            "version": "1.0.0",
-            "timestamp": datetime.utcnow().isoformat(),
-            "module": "Real-time Communication",
-            "features": [
-                "websocket_connections",
-                "progress_tracking",
-                "real_time_notifications",
-                "bulk_operation_monitoring",
-            ],
-        }
 
     logger.info("Realtime module loaded successfully")
 
@@ -362,43 +313,55 @@ except ImportError as e:
 
 
 # Include Migration Services module
-try:
-    from services.migration_services.routes import router as migration_router
+if ENABLE_EXPERIMENTAL_MIGRATION_SERVICES:
+    try:
+        from services.migration_services.routes import router as migration_router
 
-    # Include migration services routes
-    app.include_router(migration_router)
+        app.include_router(migration_router)
 
+        @app.get("/api/v1/migration-services/health")
+        async def migration_services_health():
+            """Migration Services module health check"""
+            return {
+                "status": "experimental",
+                "service": "migration_services",
+                "version": "1.0.0",
+                "timestamp": datetime.utcnow().isoformat(),
+                "module": "Migration Services",
+                "features": [
+                    "data_migration",
+                    "care_packages",
+                    "admin_statistics",
+                    "order_management",
+                ],
+            }
+
+        logger.warning("Experimental migration services module loaded")
+
+    except ImportError as e:
+        logger.warning(f"Migration Services module not available: {e}")
+
+        @app.get("/api/v1/migration-services/health")
+        async def migration_services_health_fallback():
+            """Migration Services module health check fallback"""
+            return {
+                "status": "unavailable",
+                "service": "migration_services",
+                "error": "Module not loaded",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+else:
     @app.get("/api/v1/migration-services/health")
-    async def migration_services_health():
-        """Migration Services module health check"""
+    async def migration_services_health_disabled():
+        """Migration Services module health check when disabled by default."""
         return {
-            "status": "healthy",
+            "status": "disabled",
             "service": "migration_services",
-            "version": "1.0.0",
+            "error": "Experimental module disabled for expansion readiness",
             "timestamp": datetime.utcnow().isoformat(),
-            "module": "Migration Services",
-            "features": [
-                "data_migration",
-                "care_packages",
-                "admin_statistics",
-                "order_management",
-            ],
         }
 
-    logger.info("Migration Services module loaded successfully")
-
-except ImportError as e:
-    logger.warning(f"Migration Services module not available: {e}")
-
-    @app.get("/api/v1/migration-services/health")
-    async def migration_services_health_fallback():
-        """Migration Services module health check fallback"""
-        return {
-            "status": "unavailable",
-            "service": "migration_services",
-            "error": "Module not loaded",
-            "timestamp": datetime.utcnow().isoformat(),
-        }
+    logger.info("Experimental migration services module disabled")
 
 
 # Include Finance & Billing module

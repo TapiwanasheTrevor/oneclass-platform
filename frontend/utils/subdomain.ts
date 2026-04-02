@@ -8,6 +8,8 @@ export interface SchoolSubdomain {
   schoolId: string;
 }
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 /**
  * Get the current subdomain from the URL
  */
@@ -132,18 +134,17 @@ export function redirectToMainPlatform(path: string = '/'): void {
  */
 export async function getSchoolFromSubdomain(subdomain: string): Promise<SchoolSubdomain | null> {
   try {
-    // Try the simple API first (bypasses tenant middleware)
-    const response = await fetch(`/api/v1/platform/schools-simple/by-subdomain/${subdomain}`);
+    const response = await fetch(`${API_BASE_URL}/api/v1/platform/schools/by-subdomain/${subdomain}`);
     if (!response.ok) {
-      console.warn(`Simple API failed with status: ${response.status}`);
+      console.warn(`School lookup failed with status: ${response.status}`);
       return null;
     }
 
     const school = await response.json();
     return {
       subdomain: school.subdomain,
-      schoolName: school.schoolName,
-      schoolId: school.schoolId,
+      schoolName: school.name,
+      schoolId: school.id,
     };
   } catch (error) {
     console.error('Error fetching school by subdomain:', error);
@@ -156,7 +157,7 @@ export async function getSchoolFromSubdomain(subdomain: string): Promise<SchoolS
  */
 export async function getSchoolSubdomain(schoolId: string): Promise<string | null> {
   try {
-    const response = await fetch(`/api/v1/platform/schools-simple/by-id/${schoolId}`);
+    const response = await fetch(`${API_BASE_URL}/api/v1/platform/schools/by-id/${schoolId}`);
     if (!response.ok) {
       console.warn(`Failed to get school subdomain for ID: ${schoolId}`);
       return null;

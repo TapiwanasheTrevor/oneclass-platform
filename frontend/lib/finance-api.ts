@@ -303,6 +303,7 @@ export const financeApi = {
     term_id?: string;
     due_date_from?: string;
     due_date_to?: string;
+    search?: string;
   }): Promise<{
     invoices: Invoice[];
     total_count: number;

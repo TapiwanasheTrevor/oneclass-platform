@@ -51,6 +51,9 @@ import { format } from "date-fns"
 
 import { 
   useAcademicHooks,
+  AssessmentCategory,
+  AssessmentType,
+  TermNumber,
   type AssessmentCreate,
   type Question,
   type QuestionCreate,
@@ -246,10 +249,15 @@ export default function AssessmentWizard({
 
   const handleCreateAssessment = async (data: AssessmentFormData) => {
     try {
-      const assessment = await createAssessmentMutation.mutateAsync({
+      const assessmentPayload: AssessmentCreate = {
         ...data,
+        term_number: data.term_number as TermNumber,
+        assessment_type: data.assessment_type as AssessmentType,
+        assessment_category: data.assessment_category as AssessmentCategory,
         total_marks: calculateTotalMarks() || data.total_marks
-      })
+      }
+
+      const assessment = await createAssessmentMutation.mutateAsync(assessmentPayload)
       
       toast.success("Assessment created successfully!")
       onComplete?.(assessment)

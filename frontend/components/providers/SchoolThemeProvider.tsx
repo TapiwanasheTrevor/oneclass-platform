@@ -84,14 +84,14 @@ export function SchoolThemeProvider({ children }: SchoolThemeProviderProps) {
       }
       
       // Update page title with school name
-      document.title = `OneClass - ${schoolContext.school.name}`;
+      document.title = `OneClass - ${schoolContext.school?.name || 'Platform'}`;
     }
   };
 
   // Apply theme on mount and when school context changes
   useEffect(() => {
     themeValue.applyTheme();
-  }, [schoolContext?.school.id]);
+  }, [schoolContext?.school?.id]);
 
   return (
     <ThemeContext.Provider value={themeValue}>
@@ -117,7 +117,7 @@ export function SchoolLogo({ className, fallback }: { className?: string; fallba
     return (
       <img
         src={logoUrl}
-        alt={`${schoolContext?.school.name} logo`}
+        alt={`${schoolContext?.school?.name || 'School'} logo`}
         className={className}
         onError={(e) => {
           // Hide image on error and show fallback
@@ -132,12 +132,12 @@ export function SchoolLogo({ className, fallback }: { className?: string; fallba
   }
   
   // Default fallback - school initials
-  const initials = schoolContext?.school.name
+  const initials = (schoolContext.school?.name || 'OneClass')
     .split(' ')
     .map(word => word[0])
     .join('')
     .toUpperCase()
-    .slice(0, 3) ?? '1C';
+    .slice(0, 3);
   
   return (
     <div className={`flex items-center justify-center bg-primary text-primary-foreground font-bold ${className}`}>

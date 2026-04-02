@@ -28,6 +28,9 @@ import { useSchoolContext } from '@/hooks/useSchoolContext';
 const AdminDashboard = () => {
   const { user } = useAuth();
   const { school, hasFeature } = useSchoolContext();
+  const schoolTier = school?.subscription_tier
+    ? `${school.subscription_tier.charAt(0).toUpperCase()}${school.subscription_tier.slice(1)}`
+    : 'Basic';
 
   return (
     <div className="space-y-6">
@@ -41,7 +44,7 @@ const AdminDashboard = () => {
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-sm">
-            {school?.subscription_tier?.charAt(0).toUpperCase() + school?.subscription_tier?.slice(1)}
+            {schoolTier}
           </Badge>
           <Button variant="outline" size="sm">
             <Settings className="h-4 w-4 mr-2" />

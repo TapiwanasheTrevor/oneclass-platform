@@ -17,6 +17,7 @@ from shared.models.platform_user import (
     SchoolMembership,
     UserProfile,
     UserStatus,
+    MembershipStatus,
     GlobalRole,
     SchoolRole,
 )
@@ -29,6 +30,14 @@ logger = logging.getLogger(__name__)
 
 class AuthService:
     """Service class for authentication and user management operations"""
+
+    @staticmethod
+    def _coerce_uuid(value):
+        if value is None:
+            return None
+        if isinstance(value, UUID):
+            return value
+        return UUID(str(value))
 
     async def create_user(
         self,
@@ -88,18 +97,35 @@ class AuthService:
         if not onboarding_data.password:
             raise ValueError("Password required for new user")
 
-        # Create user profile
-        profile = UserProfile(
-            phone_number=onboarding_data.phone,
-            date_of_birth=onboarding_data.date_of_birth,
-            gender=onboarding_data.gender,
-            address=onboarding_data.address,
-            emergency_contact_name=onboarding_data.emergency_contact_name,
-            emergency_contact_phone=onboarding_data.emergency_contact_phone,
-            preferred_language=onboarding_data.preferred_language,
-            timezone=onboarding_data.timezone,
-            notification_preferences=onboarding_data.notification_preferences,
-        )
+        contact_information = {
+            "primary_phone": onboarding_data.phone,
+            "personal_email": onboarding_data.email,
+            "address_line1": onboarding_data.address,
+            "country": "Zimbabwe",
+        }
+        personal_profile = {
+            "date_of_birth": (
+                onboarding_data.date_of_birth.isoformat()
+                if onboarding_data.date_of_birth
+                else None
+            ),
+            "gender": onboarding_data.gender,
+            "emergency_contact_name": onboarding_data.emergency_contact_name,
+            "emergency_contact_phone": onboarding_data.emergency_contact_phone,
+        }
+        user_preferences = {
+            "language": onboarding_data.preferred_language,
+            "timezone": onboarding_data.timezone,
+            "email_notifications": onboarding_data.notification_preferences.get(
+                "email_notifications", True
+            ),
+            "sms_notifications": onboarding_data.notification_preferences.get(
+                "sms_notifications", True
+            ),
+            "push_notifications": onboarding_data.notification_preferences.get(
+                "push_notifications", True
+            ),
+        }
 
         # Create user
         user = PlatformUser(
@@ -108,12 +134,11 @@ class AuthService:
             password_hash=hash_password(onboarding_data.password),
             first_name=onboarding_data.first_name,
             last_name=onboarding_data.last_name,
-            platform_role=onboarding_data.primary_role,
-            status=UserStatus.ACTIVE,
-            profile=profile,
-            feature_flags={},
-            user_preferences={},
-            created_at=datetime.utcnow(),
+            global_role=onboarding_data.primary_role.value,
+            status=UserStatus.ACTIVE.value,
+            contact_information=contact_information,
+            personal_profile=personal_profile,
+            user_preferences=user_preferences,
         )
 
         db.add(user)
@@ -140,29 +165,44 @@ class AuthService:
     ) -> PlatformUser:
         """Update existing user with onboarding data"""
 
-        # Update user profile
-        if not user.profile:
-            user.profile = UserProfile()
+        contact_information = dict(user.contact_information or {})
+        personal_profile = dict(user.personal_profile or {})
+        user_preferences = dict(user.user_preferences or {})
 
-        user.profile.phone_number = onboarding_data.phone or user.profile.phone_number
-        user.profile.date_of_birth = (
-            onboarding_data.date_of_birth or user.profile.date_of_birth
+        if onboarding_data.phone:
+            contact_information["primary_phone"] = onboarding_data.phone
+        contact_information["personal_email"] = onboarding_data.email
+        if onboarding_data.address:
+            contact_information["address_line1"] = onboarding_data.address
+
+        if onboarding_data.date_of_birth:
+            personal_profile["date_of_birth"] = onboarding_data.date_of_birth.isoformat()
+        if onboarding_data.gender:
+            personal_profile["gender"] = onboarding_data.gender
+        if onboarding_data.emergency_contact_name:
+            personal_profile["emergency_contact_name"] = (
+                onboarding_data.emergency_contact_name
+            )
+        if onboarding_data.emergency_contact_phone:
+            personal_profile["emergency_contact_phone"] = (
+                onboarding_data.emergency_contact_phone
+            )
+
+        user_preferences["language"] = onboarding_data.preferred_language
+        user_preferences["timezone"] = onboarding_data.timezone
+        user_preferences["email_notifications"] = onboarding_data.notification_preferences.get(
+            "email_notifications", True
         )
-        user.profile.gender = onboarding_data.gender or user.profile.gender
-        user.profile.address = onboarding_data.address or user.profile.address
-        user.profile.emergency_contact_name = (
-            onboarding_data.emergency_contact_name
-            or user.profile.emergency_contact_name
+        user_preferences["sms_notifications"] = onboarding_data.notification_preferences.get(
+            "sms_notifications", True
         )
-        user.profile.emergency_contact_phone = (
-            onboarding_data.emergency_contact_phone
-            or user.profile.emergency_contact_phone
+        user_preferences["push_notifications"] = onboarding_data.notification_preferences.get(
+            "push_notifications", True
         )
-        user.profile.preferred_language = onboarding_data.preferred_language
-        user.profile.timezone = onboarding_data.timezone
-        user.profile.notification_preferences.update(
-            onboarding_data.notification_preferences
-        )
+
+        user.contact_information = contact_information
+        user.personal_profile = personal_profile
+        user.user_preferences = user_preferences
 
         # Add new school memberships
         for membership_data in onboarding_data.school_memberships:
@@ -188,7 +228,9 @@ class AuthService:
         """Add school membership to user"""
 
         # Verify school exists
-        school_query = select(School).where(School.id == membership_data.school_id)
+        school_query = select(School).where(
+            School.id == self._coerce_uuid(membership_data.school_id)
+        )
         school_result = await db.execute(school_query)
         school = school_result.scalar_one_or_none()
 
@@ -203,9 +245,13 @@ class AuthService:
             id=uuid4(),
             user_id=user.id,
             school_id=UUID(membership_data.school_id),
-            role=membership_data.role,
+            school_name=school.name,
+            school_subdomain=school.subdomain,
+            role=membership_data.role.value
+            if hasattr(membership_data.role, "value")
+            else str(membership_data.role),
             permissions=permissions,
-            status=UserStatus.ACTIVE,
+            status=MembershipStatus.ACTIVE.value,
             joined_date=datetime.utcnow(),
             department=membership_data.department,
             employee_id=membership_data.employee_id,
@@ -316,7 +362,7 @@ class AuthService:
         return role_permissions.get(role, ["basic.access"])
 
     async def get_user_with_context(
-        self, db: AsyncSession, user_id: str
+        self, db: AsyncSession, user_id: str, current_school_id: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """Get user with full context including school memberships"""
 
@@ -326,7 +372,7 @@ class AuthService:
             .options(
                 selectinload(PlatformUser.school_memberships),
             )
-            .where(PlatformUser.id == user_id)
+            .where(PlatformUser.id == self._coerce_uuid(user_id))
         )
 
         result = await db.execute(query)
@@ -335,77 +381,133 @@ class AuthService:
         if not user:
             return None
 
-        # Build user context
+        active_memberships = [
+            membership
+            for membership in user.school_memberships
+            if membership.status == MembershipStatus.ACTIVE.value
+        ]
+        active_school_id = (
+            current_school_id or (str(user.primary_school_id) if user.primary_school_id else None)
+        )
+        active_membership = next(
+            (
+                membership
+                for membership in active_memberships
+                if str(membership.school_id) == str(active_school_id)
+            ),
+            active_memberships[0] if active_memberships else None,
+        )
+
+        contact_information = dict(user.contact_information or {})
+        personal_profile = dict(user.personal_profile or {})
+        user_preferences = dict(user.user_preferences or {})
+        current_school = None
+
+        if active_membership:
+            active_school_query = select(School).where(School.id == active_membership.school_id)
+            active_school_result = await db.execute(active_school_query)
+            active_school = active_school_result.scalar_one_or_none()
+            current_school = {
+                "school_id": str(active_membership.school_id),
+                "school_name": active_membership.school_name,
+                "school_subdomain": active_membership.school_subdomain,
+                "subdomain": active_membership.school_subdomain,
+                "subscription_tier": active_school.subscription_tier if active_school else None,
+                "role": active_membership.role,
+            }
+
+        profile = {
+            "phone_number": contact_information.get("primary_phone"),
+            "profile_image_url": personal_profile.get("profile_image_url"),
+            "date_of_birth": personal_profile.get("date_of_birth"),
+            "gender": personal_profile.get("gender"),
+            "address": contact_information.get("address_line1"),
+            "bio": personal_profile.get("bio"),
+            "display_name": user.display_name,
+            "emergency_contact": {
+                "name": personal_profile.get("emergency_contact_name"),
+                "phone": personal_profile.get("emergency_contact_phone"),
+            },
+            "preferred_language": user_preferences.get("language", "en"),
+            "timezone": user_preferences.get("timezone", "Africa/Harare"),
+        }
+        if active_membership:
+            profile["student_id"] = active_membership.student_id
+            profile["grade_level"] = active_membership.current_grade
+
         user_data = {
             "id": str(user.id),
             "email": user.email,
             "first_name": user.first_name,
             "last_name": user.last_name,
             "full_name": user.full_name,
-            "platform_role": user.platform_role.value if hasattr(user.platform_role, 'value') else str(user.platform_role),
-            "status": user.status.value if hasattr(user.status, 'value') else str(user.status),
+            "platform_role": user.platform_role,
+            "global_role": user.global_role,
+            "role": active_membership.role if active_membership else user.global_role,
+            "status": str(user.status),
             "primary_school_id": (
                 str(user.primary_school_id) if user.primary_school_id else None
             ),
-            "profile": user.profile if user.profile else {
-                "phone_number": None,
-                "preferred_language": "en",
-                "timezone": "Africa/Harare",
-                "notification_preferences": {
-                    "email_notifications": True,
-                    "sms_notifications": True,
-                    "push_notifications": True,
-                    "marketing_emails": False,
-                },
-            },
-            "feature_flags": user.feature_flags,
-            "user_preferences": user.user_preferences,
+            "current_school_id": (
+                str(active_membership.school_id) if active_membership else None
+            ),
+            "current_school": current_school,
+            "profile": profile,
+            "feature_flags": {},
+            "user_preferences": user_preferences,
+            "contact_information": contact_information,
+            "personal_profile": personal_profile,
             "created_at": user.created_at.isoformat(),
-            "last_login": user.last_login.isoformat() if user.last_login else None,
+            "last_login": (
+                user.last_login_at.isoformat() if user.last_login_at else None
+            ),
+            "last_login_at": (
+                user.last_login_at.isoformat() if user.last_login_at else None
+            ),
+            "clerk_user_id": user.clerk_user_id,
+            "is_email_verified": bool(user.is_email_verified),
+            "login_count": user.login_count or 0,
             "school_memberships": [],
         }
 
         # Add school membership details
-        for membership in user.school_memberships:
-            if membership.status == UserStatus.ACTIVE:
-                # Get school details
-                school_query = select(School).where(School.id == membership.school_id)
-                school_result = await db.execute(school_query)
-                school = school_result.scalar_one_or_none()
-
-                if school:
-                    user_data["school_memberships"].append(
-                        {
-                            "school_id": str(membership.school_id),
-                            "school_name": school.name,
-                            "school_subdomain": school.subdomain,
-                            "role": membership.role.value,
-                            "permissions": membership.permissions,
-                            "joined_date": membership.joined_date.isoformat(),
-                            "status": membership.status.value,
-                            "student_id": membership.student_id,
-                            "current_grade": membership.current_grade,
-                            "admission_date": (
-                                membership.admission_date.isoformat()
-                                if membership.admission_date
-                                else None
-                            ),
-                            "graduation_date": (
-                                membership.graduation_date.isoformat()
-                                if membership.graduation_date
-                                else None
-                            ),
-                            "employee_id": membership.employee_id,
-                            "department": membership.department,
-                            "hire_date": (
-                                membership.hire_date.isoformat()
-                                if membership.hire_date
-                                else None
-                            ),
-                            "contract_type": membership.contract_type,
-                            "children_ids": membership.children_ids or [],
-                        }
-                    )
+        for membership in active_memberships:
+            user_data["school_memberships"].append(
+                {
+                    "school_id": str(membership.school_id),
+                    "school_name": membership.school_name,
+                    "school_subdomain": membership.school_subdomain,
+                    "role": membership.role,
+                    "permissions": membership.permissions or [],
+                    "joined_date": (
+                        membership.joined_date.isoformat()
+                        if membership.joined_date
+                        else datetime.utcnow().isoformat()
+                    ),
+                    "status": membership.status,
+                    "student_id": membership.student_id,
+                    "current_grade": membership.current_grade,
+                    "admission_date": (
+                        membership.admission_date.isoformat()
+                        if membership.admission_date
+                        else None
+                    ),
+                    "graduation_date": (
+                        membership.graduation_date.isoformat()
+                        if membership.graduation_date
+                        else None
+                    ),
+                    "employee_id": membership.employee_id,
+                    "department": membership.department,
+                    "hire_date": (
+                        membership.hire_date.isoformat()
+                        if membership.hire_date
+                        else None
+                    ),
+                    "contract_type": membership.contract_type,
+                    "children_ids": [str(child) for child in (membership.children_ids or [])],
+                }
+            )
 
         return user_data
 
@@ -416,9 +518,9 @@ class AuthService:
 
         query = select(SchoolMembership).where(
             and_(
-                SchoolMembership.user_id == user_id,
-                SchoolMembership.school_id == school_id,
-                SchoolMembership.status == UserStatus.ACTIVE,
+                SchoolMembership.user_id == self._coerce_uuid(user_id),
+                SchoolMembership.school_id == self._coerce_uuid(school_id),
+                SchoolMembership.status == MembershipStatus.ACTIVE.value,
             )
         )
 
@@ -430,7 +532,9 @@ class AuthService:
     ) -> List[str]:
         """Get user's permissions for a specific school or platform-wide"""
 
-        user_query = select(PlatformUser).where(PlatformUser.id == user_id)
+        user_query = select(PlatformUser).where(
+            PlatformUser.id == self._coerce_uuid(user_id)
+        )
         user_result = await db.execute(user_query)
         user = user_result.scalar_one_or_none()
 
@@ -438,7 +542,7 @@ class AuthService:
             return []
 
         # Super admin has all permissions
-        if user.platform_role == PlatformRole.SUPER_ADMIN:
+        if user.is_platform_admin:
             return ["*"]
 
         permissions = []
@@ -453,7 +557,7 @@ class AuthService:
             memberships_query = select(SchoolMembership).where(
                 and_(
                     SchoolMembership.user_id == user_id,
-                    SchoolMembership.status == UserStatus.ACTIVE,
+                    SchoolMembership.status == MembershipStatus.ACTIVE.value,
                 )
             )
             memberships_result = await db.execute(memberships_query)

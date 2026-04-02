@@ -48,7 +48,7 @@ class SSOProvider(Base):
 
     # Configuration
     configuration = Column(JSON, default=dict)
-    metadata = Column(JSON, default=dict)
+    metadata_json = Column("metadata", JSON, default=dict)
 
     # Mapping configuration
     attribute_mapping = Column(JSON, default=dict)
@@ -255,7 +255,7 @@ class SSOAuditLog(Base):
     session_id = Column(String(255), nullable=True)
 
     # Additional data
-    metadata = Column(JSON, default=dict)
+    metadata_json = Column("metadata", JSON, default=dict)
 
     # Timestamp
     created_at = Column(DateTime, default=datetime.utcnow)

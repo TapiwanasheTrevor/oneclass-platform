@@ -58,8 +58,8 @@ class TenantMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, db_session_factory=None):
         super().__init__(app)
         self.db_session_factory = db_session_factory or self._get_db_connection
-        
-        # Routes that don't require tenant context
+
+        # Exact routes that don't require tenant context.
         self.public_routes = {
             '/',
             '/health',
@@ -67,19 +67,20 @@ class TenantMiddleware(BaseHTTPMiddleware):
             '/redoc',
             '/openapi.json',
             '/api/health',
-            '/api/v1/platform/schools',  # School creation
-            '/api/v1/platform/schools/by-subdomain',  # Subdomain lookup
-            '/api/v1/schools/validate-subdomain',
-            '/api/v1/schools/suggest-subdomains',
-            '/api/v1/schools/by-subdomain',
-            '/api/v1/schools/onboard',
+            '/api/v1/platform/schools',
             '/api/v1/auth/login',
             '/api/v1/auth/signup',
             '/api/v1/auth/refresh',
             '/api/v1/sis/health',
             '/api/v1/analytics/health'
         }
-        
+
+        # Prefix routes that are public by design.
+        self.public_route_prefixes = (
+            '/docs/',
+            '/redoc/',
+        )
+
         # Platform admin routes (no tenant isolation)
         self.platform_routes = {
             '/api/v1/platform',
@@ -88,11 +89,8 @@ class TenantMiddleware(BaseHTTPMiddleware):
 
         # Public routes that don't need tenant context
         self.public_platform_routes = {
-            '/api/v1/platform/schools/public',
             '/api/v1/platform/schools/by-subdomain',
-            '/api/v1/platform/schools/subdomain-check',
-            '/api/v1/platform/schools/health',
-            '/api/v1/platform/schools-simple'
+            '/api/v1/platform/schools/by-id',
         }
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
@@ -389,7 +387,9 @@ class TenantMiddleware(BaseHTTPMiddleware):
     
     def _is_public_route(self, path: str) -> bool:
         """Check if route is public"""
-        return any(path.startswith(route) for route in self.public_routes)
+        return path in self.public_routes or any(
+            path.startswith(route) for route in self.public_route_prefixes
+        )
     
     def _is_platform_route(self, path: str) -> bool:
         """Check if route is platform admin route"""
