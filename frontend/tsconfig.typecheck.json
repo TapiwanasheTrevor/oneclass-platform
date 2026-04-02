@@ -10,16 +10,19 @@
     "hooks/**/*.tsx",
     "lib/**/*.ts",
     "lib/**/*.tsx",
+    "proxy.ts",
     "types/**/*.d.ts",
     "utils/**/*.ts",
-    "utils/**/*.tsx",
-    "middleware.ts"
+    "utils/**/*.tsx"
   ],
   "exclude": [
     "node_modules",
     "tests",
     "**/*.test.ts",
     "**/*.test.tsx",
-    "**/__tests__/**"
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/__tests__/**",
+    "vitest.config.ts"
   ]
 }

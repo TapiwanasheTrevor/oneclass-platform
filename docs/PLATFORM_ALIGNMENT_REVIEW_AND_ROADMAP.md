@@ -507,10 +507,11 @@ This pass moved the codebase from "green on a narrow path" to "verifiable expans
   - `/super-admin`
 - A repeatable verification command now exists:
   - `npm run verify:readiness`
+- Frontend app build now runs with real Next.js type validation again; `ignoreBuildErrors` is no longer part of the active build path.
+- Frontend E2E entrypoints now fail honestly with a provisioning message instead of pointing at a missing script.
+- Next.js output tracing root is now configured explicitly for the nested frontend app, so the build no longer depends on lockfile inference.
 
-The current readiness proof is green with one non-blocking framework warning:
-
-- The workspace still has multiple lockfiles, so Next.js infers the root with a warning.
+The current readiness proof is green.
 
 Behavioral test completeness is still below the expansion bar:
 

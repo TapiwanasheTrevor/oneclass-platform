@@ -15,7 +15,9 @@ build/
 .next/
 .pytest_cache/
 coverage/
+test-results/
 *.pyc
+*.tsbuildinfo
 
 # IDE
 .vscode/*
