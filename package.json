@@ -48,7 +48,8 @@
     "ci:test": "npm run test:coverage && npm run lint && npm run type-check",
     "ci:build": "npm run build",
     "verify:readiness": "bash scripts/verify-expansion-readiness.sh",
-    "ci:deploy": "npm run build && npm run docker:build"
+    "ci:deploy": "npm run build && npm run docker:build",
+    "prepare": "husky"
   },
   "keywords": [
     "school",
@@ -63,6 +64,7 @@
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^8.2.0",
+    "husky": "^9.1.7",
     "nodemon": "^3.0.1"
   },
   "engines": {
